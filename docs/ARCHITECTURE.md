@@ -212,6 +212,137 @@ class InstrumentResolver:
 
 ---
 
+## Instrument Manager
+
+### Cache Directory
+All runtime artifacts live in `_cache/` at the project root:
+```
+_cache/
+├── instruments.db   # SQLite instrument master
+├── session.json     # broker session tokens
+```
+
+### Stale Data Behaviour
+User-configurable via `BrokerConfig`:
+- `on_stale="fail"` — hard fail if instrument dump cannot be refreshed at startup (default)
+- `on_stale="warn"` — log a warning and continue with stale data
+
+### Schema
+
+Normalized structure — separates instrument identity from broker-specific tokens.
+Instrument type specific fields live in their own tables. No NULL columns.
+
+```sql
+-- Canonical instrument identity
+CREATE TABLE instruments (
+    id        INTEGER PRIMARY KEY,
+    exchange  TEXT NOT NULL,
+    symbol    TEXT NOT NULL,
+    name      TEXT,
+    lot_size  INTEGER,
+    tick_size REAL
+);
+
+CREATE TABLE equities (
+    instrument_id INTEGER PRIMARY KEY REFERENCES instruments(id),
+    isin          TEXT
+);
+
+CREATE TABLE futures (
+    instrument_id INTEGER PRIMARY KEY REFERENCES instruments(id),
+    underlying_id INTEGER NOT NULL REFERENCES instruments(id),
+    expiry        DATE NOT NULL
+);
+
+CREATE TABLE options (
+    instrument_id INTEGER PRIMARY KEY REFERENCES instruments(id),
+    underlying_id INTEGER NOT NULL REFERENCES instruments(id),
+    expiry        DATE NOT NULL,
+    strike        REAL NOT NULL,
+    option_type   TEXT NOT NULL  -- CE, PE
+);
+
+-- One canonical instrument maps to N broker tokens
+CREATE TABLE broker_tokens (
+    instrument_id INTEGER NOT NULL REFERENCES instruments(id),
+    broker_id     TEXT NOT NULL,
+    token         TEXT NOT NULL,
+    PRIMARY KEY (instrument_id, broker_id)
+);
+
+-- Indices for fast resolution
+CREATE INDEX idx_instruments ON instruments(exchange, symbol);
+CREATE INDEX idx_futures      ON futures(underlying_id, expiry);
+CREATE INDEX idx_options      ON options(underlying_id, expiry, strike, option_type);
+```
+
+**Insert order during refresh:** `instruments` → type table (`equities`/`futures`/`options`) → `broker_tokens`.
+Underlyings (e.g. NIFTY equity) must be inserted before futures/options that reference them.
+
+### Refresh Lifecycle
+Rebuild from scratch daily — truncate all tables and re-fetch from broker on startup if `last_updated` is not today.
+No delta updates, no diffing.
+
+---
+
+## Error Handling
+
+### Exception Hierarchy (`exceptions.py`)
+Canonical exception types shared across the entire library. User only ever catches these.
+
+```python
+class TTConnectError(Exception): ...
+
+class AuthenticationError(TTConnectError):     retryable = False
+class RateLimitError(TTConnectError):          retryable = True
+class InsufficientFundsError(TTConnectError):  retryable = False
+class InstrumentNotFoundError(TTConnectError): retryable = False
+class UnsupportedFeatureError(TTConnectError): retryable = False
+class OrderError(TTConnectError):              retryable = False
+class InvalidOrderError(OrderError):           retryable = False
+class OrderNotFoundError(OrderError):          retryable = False
+class BrokerError(TTConnectError):             retryable = False  # catch-all for unmapped errors
+```
+
+### Error Map (per broker transformer)
+Each broker transformer declares a map from its own error codes to canonical exceptions.
+Unmapped errors fall back to `BrokerError`, preserving the raw code and message.
+
+```python
+# adapters/zerodha/transformer.py
+ERROR_MAP: dict[str, type[TTConnectError]] = {
+    "TokenException":      AuthenticationError,
+    "PermissionException": AuthenticationError,
+    "OrderException":      OrderError,
+    "InputException":      InvalidOrderError,
+    "NetworkException":    BrokerError,
+}
+
+@staticmethod
+def parse_error(raw: dict) -> TTConnectError:
+    code = raw.get("error_type", "")
+    message = raw.get("message", "Unknown error")
+    exc_class = ERROR_MAP.get(code, BrokerError)
+    return exc_class(message, broker_code=code)
+```
+
+### Central Error Check in Adapter Base
+Every HTTP response passes through one method. Error detection and raising happens once.
+
+```python
+# adapters/base.py
+async def _request(self, method, url, **kwargs) -> dict:
+    response = await self._client.request(method, url, **kwargs)
+    raw = response.json()
+    if self._is_error(raw, response.status_code):
+        raise self.transformer.parse_error(raw)
+    return raw
+```
+
+Each broker overrides `_is_error()` since success/failure is indicated differently per broker.
+
+---
+
 ## Broker Capability Handling
 
 Each broker adapter has an internal capability matrix declaring what it supports — segments, order types, product types etc.
