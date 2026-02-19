@@ -2,9 +2,24 @@
 
 ## Responsibilities
 
-1. Parsing, storing and maintaining instruments into a common SQLite DB for easy access and resolution
-2. REST APIs — Auth, Profile, Funds, Holdings, Positions, Trades, Orders
-3. WebSocket — streaming market data and order updates
+### 1. Universal Instrument Resolver
+A SQLite-backed engine that validates canonical instrument objects against the live master and translates them to broker-specific tokens. Instrument objects are validated against the DB — not just type-checked. Requires the DB to be initialized before instrument construction.
+
+### 2. Declarative Lifecycle Manager
+Handles the auth flow, session persistence, token refresh, and TOTP automation entirely in the background. The user never calls login again after initialization. This is a state machine, not an API.
+
+### 3. Normalization Pipeline
+Bidirectional translation layer:
+- **Outgoing:** canonical `Instrument` objects + enums → broker-specific request params
+- **Incoming:** broker-specific JSON envelopes → canonical Pydantic models
+
+This is what makes tt-connect an abstraction, not a wrapper. Without this, broker internals leak into user code.
+
+### 4. Reactive Streaming Engine
+Unified WebSocket wrapper — manages connection lifecycle, reconnection, and translates raw broker ticks into a stream of standardized `Tick` objects.
+
+### 5. Duality Wrapper
+Proxy layer that makes the library natively usable in both sync and async Python without maintaining two codebases. Core is async-first; sync client wraps it in one place.
 
 ---
 

@@ -13,14 +13,15 @@ Write once. Point at any broker.
 
 ## Problem Breakdown
 
-### 1. Fragmented Authentication
+### 1. Auth is a Daily Background Problem, Not a One-Time Call
 - Every broker has a different auth flow
   - Zerodha (Kite): OAuth + request token exchange
   - Angel One (SmartAPI): JWT + TOTP
   - Upstox: OAuth 2.0 with its own token lifecycle
   - Finvasia (Shoonya): SHA256-hashed password auth
-- Sessions expire daily (SEBI mandate) — re-login automation is non-trivial
+- Sessions expire daily (SEBI mandate) — re-login must be automated, not manual
 - TOTP/2FA handling is inconsistent and undocumented
+- Developers end up building fragile session state machines for every broker they support
 
 ### 2. No Standardized Data Model
 - Same concept has 10 different names across brokers
@@ -38,6 +39,7 @@ Write once. Point at any broker.
 - Weekly vs monthly expiry symbols are formatted differently across brokers
 - No universal instrument identifier exists across the Indian broker ecosystem
 - Strategies hardcode broker-specific symbols, making them non-portable
+- There is no validation that a symbol/expiry actually exists — bad inputs silently reach the broker and fail with cryptic errors
 
 ### 4. Inconsistent Request & Response Formats
 - HTTP methods differ for the same operation — some brokers use GET for order placement, others POST

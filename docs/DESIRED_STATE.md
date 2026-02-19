@@ -9,20 +9,24 @@ Broker is a configuration detail, not an architectural one.
 
 ## Decisions Locked In
 
-### 1. Auth is a Config, Not Code
-- Pass credentials, the library handles OAuth, TOTP, session refresh, and daily re-login
+### 1. Auth is a Background Lifecycle, Not a User Concern
+- Pass credentials once — the library owns the entire auth state machine
+- Handles OAuth, TOTP, session persistence, and daily re-login silently
+- User initializes once and never thinks about auth again
 - Swapping broker does not change any auth-handling code
 
 ```python
 broker = TTConnect("zerodha", config)
-broker.login()
+# That's it. Session is managed, refreshed, and persisted automatically.
 ```
 
 ### 2. Typed Instrument Objects + Enums, Not Strings
 - Instruments are strongly-typed objects — no magic strings
 - Symbols follow NSE official naming conventions as the canonical standard
 - tt-connect translates to broker-specific format internally
-- Validation at construction time — bad inputs fail early, not at broker call time
+- Validation uses the live instrument DB — not just type checking
+- Invalid expiries, non-existent strikes, unsupported symbols fail at construction, not at broker call time
+- Instrument objects are only valid after `TTConnect` is initialized and the DB is fresh
 
 ```python
 from tt_connect.instruments import Equity, Future, Option
