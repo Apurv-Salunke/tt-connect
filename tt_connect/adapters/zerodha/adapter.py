@@ -13,7 +13,11 @@ class ZerodhaAdapter(BrokerAdapter, broker_id="zerodha"):
     def __init__(self, config: dict):
         super().__init__(config)
         self.auth = ZerodhaAuth(config, self._client)
-        self.transformer = ZerodhaTransformer()
+        self._transformer = ZerodhaTransformer()
+
+    @property
+    def transformer(self) -> ZerodhaTransformer:
+        return self._transformer
 
     # --- Lifecycle ---
 
