@@ -1,0 +1,14 @@
+{
+  "status": "success",
+  "data": [
+    {
+      "tradingsymbol": "SBIN",
+      "exchange": "NSE",
+      "isin": "INE062A01020",
+      "quantity": 10,
+      "average_price": 400.0,
+      "last_price": 440.0,
+      "pnl": 400.0
+    }
+  ]
+}
