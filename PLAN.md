@@ -6,6 +6,7 @@
 ---
 
 ## Status Legend
+
 - `[ ]` Not started
 - `[x]` Done
 
@@ -13,7 +14,7 @@
 
 ## What's Already Done
 
-- [x] DB schema — instruments, equities, futures, options, broker_tokens, _meta
+- [x] DB schema — instruments, equities, futures, options, broker_tokens, \_meta
 - [x] Instrument types — Index, Equity, Future, Option (Pydantic)
 - [x] InstrumentManager — full parse + insert pipeline (indices, equities, futures, options)
 - [x] InstrumentResolver — Index, Equity, Future, Option (live-tested)
@@ -99,61 +100,7 @@
 
 ---
 
-## Phase 6 — Upstox Adapter
-
-> Full parallel implementation to Zerodha. Reference: openalgo/brokers/upstox.
-
-### 6a — Auth
-- [ ] Upstox OAuth2 PKCE flow (different from Zerodha — uses `code_verifier`)
-- [ ] Token exchange: `POST https://api.upstox.com/v2/login/authorization/token`
-- [ ] Option A: token injection (same pattern as Zerodha)
-- [ ] `get_token.py` variant for Upstox dev helper
-
-### 6b — Instruments
-- [ ] Upstox instrument CSV/JSON source and format differences
-- [ ] Upstox parser (maps to same `ParsedInstruments` container)
-- [ ] Verify indices, equities, futures, options all resolve
-
-### 6c — Transformer
-- [ ] `to_profile(raw)` — Upstox field names differ (`data.user_id`, `data.user_name`, etc.)
-- [ ] `to_fund(raw)`
-- [ ] `to_holding(raw)`
-- [ ] `to_position(raw)`
-- [ ] `to_trade(raw)`
-- [ ] `to_order(raw)`
-- [ ] `to_order_params(...)`
-- [ ] `to_margin_params(...)`
-- [ ] `to_margin(raw)`
-- [ ] `parse_error(raw)`
-
-### 6d — Adapter (REST)
-- [ ] `login()` / `refresh_session()`
-- [ ] `fetch_instruments()`
-- [ ] `get_profile()` — `GET /v2/user/profile`
-- [ ] `get_funds()` — `GET /v2/user/get-funds-and-margin`
-- [ ] `get_holdings()` — `GET /v2/portfolio/long-term-holdings`
-- [ ] `get_positions()` — `GET /v2/portfolio/short-term-positions`
-- [ ] `get_orders()` — `GET /v2/order/retrieve-all`
-- [ ] `get_order()` — `GET /v2/order/details?order_id=`
-- [ ] `get_trades()` — `GET /v2/order/trades/get-trades-for-day`
-- [ ] `place_order()` — `POST /v2/order/place`
-- [ ] `modify_order()` — `PUT /v2/order/modify`
-- [ ] `cancel_order()` — `DELETE /v2/order/cancel?order_id=`
-- [ ] `calculate_margin()` — `POST /v2/charges/margin`
-- [ ] `_is_error(raw, status_code)`
-
-### 6e — Capabilities
-- [ ] `UPSTOX_CAPABILITIES` — segments, order_types, product_types
-
-### 6f — Dev Tests (Upstox)
-- [ ] `test_live_auth_upstox.py`
-- [ ] `test_live_instruments_upstox.py`
-- [ ] `test_live_fno_upstox.py`
-- [ ] `test_live_portfolio_upstox.py`
-
----
-
-## Phase 7 — Hardening
+## Phase 6 — Hardening
 
 - [ ] **Unit tests** — parser, transformer (to_holding, to_position, to_trade, to_fund, to_order) using fixture dicts, no real API calls
 - [ ] **`on_stale=WARN`** path tested — verify stale DB serves cached data instead of crashing
