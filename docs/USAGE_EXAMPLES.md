@@ -23,7 +23,7 @@ broker = AsyncTTConnect("zerodha", config={...})
 ```
 
 Session is managed automatically. No `login()` call. No token refresh logic. No daily re-login code.
-Swap `"zerodha"` for `"upstox"` — nothing else changes.
+Swap `"zerodha"` for `"angelone"` — nothing else changes.
 
 ---
 
@@ -153,8 +153,8 @@ async def main():
 # Strategy works on Zerodha today
 broker = TTConnect("zerodha", config=zerodha_config)
 
-# Move to Upstox tomorrow — zero other changes
-broker = TTConnect("upstox", config=upstox_config)
+# Move to AngelOne tomorrow — zero other changes
+broker = TTConnect("angelone", config=angelone_config)
 
 # Instruments, orders, streaming — all identical
 holdings = broker.get_holdings()

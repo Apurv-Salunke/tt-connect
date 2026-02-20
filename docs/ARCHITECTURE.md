@@ -3,22 +3,28 @@
 ## Responsibilities
 
 ### 1. Universal Instrument Resolver
+
 A SQLite-backed engine that validates canonical instrument objects against the live master and translates them to broker-specific tokens. Instrument objects are validated against the DB — not just type-checked. Requires the DB to be initialized before instrument construction.
 
 ### 2. Declarative Lifecycle Manager
+
 Handles the auth flow, session persistence, token refresh, and TOTP automation entirely in the background. The user never calls login again after initialization. This is a state machine, not an API.
 
 ### 3. Normalization Pipeline
+
 Bidirectional translation layer:
+
 - **Outgoing:** canonical `Instrument` objects + enums → broker-specific request params
 - **Incoming:** broker-specific JSON envelopes → canonical Pydantic models
 
 This is what makes tt-connect an abstraction, not a wrapper. Without this, broker internals leak into user code.
 
 ### 4. Reactive Streaming Engine
+
 Unified WebSocket wrapper — manages connection lifecycle, reconnection, and translates raw broker ticks into a stream of standardized `Tick` objects.
 
 ### 5. Duality Wrapper
+
 Proxy layer that makes the library natively usable in both sync and async Python without maintaining two codebases. Core is async-first; sync client wraps it in one place.
 
 ---
@@ -45,7 +51,7 @@ tt_connect/
 │   │   ├── auth.py
 │   │   ├── transformer.py # request/response normalization
 │   │   └── capabilities.py
-│   └── upstox/
+│   └── angelone/
 │       ├── adapter.py
 │       ├── auth.py
 │       ├── transformer.py
@@ -61,44 +67,50 @@ tt_connect/
 
 ## Technology Decisions
 
-| Concern | Choice | Reason |
-|---|---|---|
+| Concern             | Choice      | Reason                                                                                    |
+| ------------------- | ----------- | ----------------------------------------------------------------------------------------- |
 | Models / Validation | Pydantic v2 | Runtime type enforcement critical for trading; built in Rust, fast; ubiquitous dependency |
-| SQLite access | `aiosqlite` | Thin async wrapper over stdlib `sqlite3`, minimal overhead, no ORM magic |
-| HTTP client | `httpx` | Native async support, sync client available, clean API |
-| Core design | Async-first | Trading engines are event-driven; sync client wraps async in one place |
+| SQLite access       | `aiosqlite` | Thin async wrapper over stdlib `sqlite3`, minimal overhead, no ORM magic                  |
+| HTTP client         | `httpx`     | Native async support, sync client available, clean API                                    |
+| Core design         | Async-first | Trading engines are event-driven; sync client wraps async in one place                    |
 
 ---
 
 ## Components
 
 ### 1. Instrument Manager
+
 - Fetches, parses and stores the instrument/symbol master into SQLite
 - Handles refresh lifecycle (NSE updates instruments, lot sizes, expiry calendars)
 - Core job: resolves a typed instrument object to the broker-specific token/symbol
 - Resolution is cached via `lru_cache` — SQLite lookups happen once per session
 
 ### 2. Broker Adapters
+
 - One adapter per broker, each subclassing `BrokerAdapter`
 - Auto-registers itself via `__init_subclass__` — no registry file to maintain
 - Each adapter has 4 files: `adapter.py`, `auth.py`, `transformer.py`, `capabilities.py`
 - Nothing outside the adapter knows about broker internals
 
 ### 3. REST Client
+
 - Unified interface for: Auth, Profile, Funds, Holdings, Positions, Orders, Trades
 - Sits on top of the broker adapter
 - Always returns normalized Pydantic models — no broker-specific keys leak out
 
 ### 4. WebSocket Client
+
 - Manages the streaming connection lifecycle — connect, subscribe, unsubscribe, reconnect
 - Normalizes raw tick data into standard `Tick` models before emitting to the caller
 
 ### 5. Models / Schemas
+
 - Pydantic v2 models — validation, serialization, and type safety for free
 - Frozen (immutable) by default
 - `Order`, `Position`, `Holding`, `Tick`, `Profile`, `Fund`
 
 ### 6. Instruments + Enums
+
 - Typed instrument classes: `Equity`, `Future`, `Option`, `Currency`
 - Enums for all categorical inputs: `Exchange`, `OptionType`, `ProductType`, `OrderType`, `Side`
 - Symbols follow NSE official naming conventions as the canonical standard
@@ -109,6 +121,7 @@ tt_connect/
 ## Key Patterns
 
 ### Auto-registration via `__init_subclass__`
+
 No registry file to maintain. A broker registers itself just by existing.
 
 ```python
@@ -132,6 +145,7 @@ class AsyncTTConnect:
 ```
 
 ### Capability Checking
+
 Capability matrix is internal to each adapter. Check happens before any network call. No capability API is exposed to the user.
 
 ```python
@@ -157,6 +171,7 @@ ZERODHA_CAPABILITIES = Capabilities(
 ```
 
 ### Transformer Pattern
+
 All request building and response parsing is isolated inside the broker adapter. Nothing else touches raw broker data.
 
 ```python
@@ -181,6 +196,7 @@ class ZerodhaTransformer:
 ```
 
 ### Pydantic v2 Models
+
 Validation, serialization, and IDE support for free. Frozen by default.
 
 ```python
@@ -198,6 +214,7 @@ class Order(BaseModel):
 ```
 
 ### Sync Wrapper
+
 Core logic is async. Sync client wraps it in one place — zero duplication.
 
 ```python
@@ -214,6 +231,7 @@ class TTConnect:
 ```
 
 ### Instrument Resolution with `lru_cache`
+
 Symbol resolution is a SQLite lookup. Cached after first call.
 
 ```python
@@ -230,7 +248,9 @@ class InstrumentResolver:
 ## Instrument Manager
 
 ### Cache Directory
+
 All runtime artifacts live in `_cache/` at the project root:
+
 ```
 _cache/
 ├── instruments.db   # SQLite instrument master
@@ -238,7 +258,9 @@ _cache/
 ```
 
 ### Stale Data Behaviour
+
 User-configurable via `BrokerConfig`:
+
 - `on_stale="fail"` — hard fail if instrument dump cannot be refreshed at startup (default)
 - `on_stale="warn"` — log a warning and continue with stale data
 
@@ -295,6 +317,7 @@ CREATE INDEX idx_options      ON options(underlying_id, expiry, strike, option_t
 Underlyings (e.g. NIFTY equity) must be inserted before futures/options that reference them.
 
 ### Refresh Lifecycle
+
 Rebuild from scratch daily — truncate all tables and re-fetch from broker on startup if `last_updated` is not today.
 No delta updates, no diffing.
 
@@ -303,6 +326,7 @@ No delta updates, no diffing.
 ## Error Handling
 
 ### Exception Hierarchy (`exceptions.py`)
+
 Canonical exception types shared across the entire library. User only ever catches these.
 
 ```python
@@ -320,6 +344,7 @@ class BrokerError(TTConnectError):             retryable = False  # catch-all fo
 ```
 
 ### Error Map (per broker transformer)
+
 Each broker transformer declares a map from its own error codes to canonical exceptions.
 Unmapped errors fall back to `BrokerError`, preserving the raw code and message.
 
@@ -342,6 +367,7 @@ def parse_error(raw: dict) -> TTConnectError:
 ```
 
 ### Central Error Check in Adapter Base
+
 Every HTTP response passes through one method. Error detection and raising happens once.
 
 ```python
@@ -366,7 +392,7 @@ Each broker adapter has an internal capability matrix declaring what it supports
 
 ```
 UnsupportedFeatureError: Zerodha does not support MCX segment
-UnsupportedFeatureError: Upstox does not support SL_M order type
+UnsupportedFeatureError: AngelOne does not support this order type
 ```
 
 No warnings. No fallbacks. No user-side capability checks.
