@@ -1,0 +1,14 @@
+{
+  "status": "success",
+  "data": [
+    {
+      "tradingsymbol": "NIFTY26FEBFUT",
+      "exchange": "NFO",
+      "quantity": 50,
+      "average_price": 23100.0,
+      "last_price": 23150.0,
+      "pnl": 2500.0,
+      "product": "NRML"
+    }
+  ]
+}

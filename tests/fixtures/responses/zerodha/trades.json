@@ -1,0 +1,15 @@
+{
+  "status": "success",
+  "data": [
+    {
+      "order_id": "12345",
+      "tradingsymbol": "SBIN",
+      "exchange": "NSE",
+      "transaction_type": "BUY",
+      "quantity": 10,
+      "average_price": 400.0,
+      "product": "CNC",
+      "fill_timestamp": "2026-02-21T10:00:00"
+    }
+  ]
+}

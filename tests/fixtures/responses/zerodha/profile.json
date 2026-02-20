@@ -1,0 +1,13 @@
+{
+  "status": "success",
+  "data": {
+    "user_id": "ZZ0001",
+    "user_name": "Test User",
+    "email": "test@example.com",
+    "mobile": "9999999999",
+    "user_type": "individual",
+    "broker": "ZERODHA",
+    "products": ["CNC", "NRML", "MIS", "BO", "CO"],
+    "exchanges": ["NSE", "BSE", "NFO", "BFO", "CDS", "MCX"]
+  }
+}
