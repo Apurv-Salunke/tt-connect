@@ -9,6 +9,15 @@ class Instrument(BaseModel, frozen=True):
     symbol: str
 
 
+class Index(Instrument):
+    """
+    A market index (NIFTY 50, SENSEX, NIFTY BANK etc.).
+    Not directly tradeable — used for LTP subscription and as
+    the canonical underlying reference for index F&O.
+    """
+    exchange: Exchange
+
+
 class Equity(Instrument):
     exchange: Exchange
 

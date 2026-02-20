@@ -2,6 +2,7 @@ from tt_connect.adapters.base import BrokerAdapter
 from tt_connect.adapters.zerodha.auth import ZerodhaAuth
 from tt_connect.adapters.zerodha.transformer import ZerodhaTransformer
 from tt_connect.adapters.zerodha.capabilities import ZERODHA_CAPABILITIES
+from tt_connect.adapters.zerodha.parser import parse, ParsedInstruments
 from tt_connect.capabilities import Capabilities
 
 BASE_URL = "https://api.kite.trade"
@@ -22,10 +23,10 @@ class ZerodhaAdapter(BrokerAdapter, broker_id="zerodha"):
     async def refresh_session(self) -> None:
         await self.auth.refresh()
 
-    async def fetch_instruments(self) -> list[dict]:
+    async def fetch_instruments(self) -> ParsedInstruments:
         response = await self._client.get(f"{BASE_URL}/instruments")
-        # Parse Zerodha CSV instrument dump
-        raise NotImplementedError
+        response.raise_for_status()
+        return parse(response.text)
 
     # --- REST ---
 

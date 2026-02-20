@@ -8,6 +8,7 @@ CREATE TABLE IF NOT EXISTS instruments (
     id        INTEGER PRIMARY KEY,
     exchange  TEXT NOT NULL,
     symbol    TEXT NOT NULL,
+    segment   TEXT NOT NULL,
     name      TEXT,
     lot_size  INTEGER,
     tick_size REAL
@@ -36,6 +37,7 @@ CREATE TABLE IF NOT EXISTS broker_tokens (
     instrument_id INTEGER NOT NULL REFERENCES instruments(id),
     broker_id     TEXT NOT NULL,
     token         TEXT NOT NULL,
+    broker_symbol TEXT NOT NULL,
     PRIMARY KEY (instrument_id, broker_id)
 );
 
