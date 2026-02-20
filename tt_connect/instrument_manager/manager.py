@@ -37,14 +37,17 @@ class InstrumentManager:
         logger.info("Instrument refresh complete")
 
     async def _insert(self, parsed) -> None:
-        # Chunk 1: indices — must go in before futures/options reference them
+        # Chunk 1: indices — must exist before futures/options reference them
         await self._insert_indices(parsed.indices)
 
         # Chunk 2: equities
         await self._insert_equities(parsed.equities)
 
-        # Chunk 3: futures   — coming soon
-        # Chunk 4: options   — coming soon
+        # Chunk 3: futures — underlying_id resolved from lookup built after chunks 1+2
+        lookup = await self._build_underlying_lookup()
+        await self._insert_futures(parsed.futures, lookup)
+
+        # Chunk 4: options — coming soon
 
         await self._conn.commit()
 
@@ -111,6 +114,63 @@ class InstrumentManager:
                 """,
                 (instrument_id, self._broker_id, eq.broker_token, eq.broker_symbol),
             )
+
+    async def _build_underlying_lookup(self) -> dict[tuple[str, str], int]:
+        """
+        Build a {(exchange, symbol) → instrument_id} dict from all rows currently
+        in the instruments table. Called after indices + equities are inserted so
+        futures can resolve their underlying_id without per-row SELECT queries.
+        """
+        async with self._conn.execute(
+            "SELECT id, exchange, symbol FROM instruments"
+        ) as cur:
+            rows = await cur.fetchall()
+        return {(row[1], row[2]): row[0] for row in rows}
+
+    async def _insert_futures(self, futures, lookup: dict) -> None:
+        if not futures:
+            return
+
+        logger.info(f"Inserting {len(futures)} futures")
+        skipped = 0
+
+        for fut in futures:
+            underlying_id = lookup.get((fut.underlying_exchange, fut.symbol))
+            if underlying_id is None:
+                logger.warning(
+                    f"Skipping {fut.broker_symbol}: underlying "
+                    f"({fut.underlying_exchange}, {fut.symbol}) not in DB"
+                )
+                skipped += 1
+                continue
+
+            # 1. Base instrument record
+            cursor = await self._conn.execute(
+                """
+                INSERT INTO instruments (exchange, symbol, segment, name, lot_size, tick_size)
+                VALUES (?, ?, ?, ?, ?, ?)
+                """,
+                (fut.exchange, fut.symbol, fut.segment, None, fut.lot_size, fut.tick_size),
+            )
+            instrument_id = cursor.lastrowid
+
+            # 2. Futures sub-table
+            await self._conn.execute(
+                "INSERT INTO futures (instrument_id, underlying_id, expiry) VALUES (?, ?, ?)",
+                (instrument_id, underlying_id, fut.expiry.isoformat()),
+            )
+
+            # 3. Broker token
+            await self._conn.execute(
+                """
+                INSERT INTO broker_tokens (instrument_id, broker_id, token, broker_symbol)
+                VALUES (?, ?, ?, ?)
+                """,
+                (instrument_id, self._broker_id, fut.broker_token, fut.broker_symbol),
+            )
+
+        if skipped:
+            logger.warning(f"Skipped {skipped} futures due to unresolved underlyings")
 
     async def _is_stale(self) -> bool:
         async with self._conn.execute(
