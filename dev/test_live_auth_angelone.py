@@ -10,7 +10,7 @@ import os
 from pathlib import Path
 
 def _load_env():
-    env_file = Path(__file__).parent.parent / ".env"
+    env_file = Path(__file__).parent.parent.parent / ".env"
     if not env_file.exists():
         return
     for line in env_file.read_text().splitlines():
@@ -47,13 +47,14 @@ async def run():
         print("✓ Login successful")
 
         # 2. Get Profile
-        profile_raw = await broker._adapter.get_profile()
-        print(f"✓ Profile fetch successful: {profile_raw.get('data', {}).get('name')}")
+        profile = await broker.get_profile()
+        print(f"✓ Profile mapped: {profile}")
+        assert profile.client_id == config['client_id']
 
         # 3. Get Funds
-        funds_raw = await broker._adapter.get_funds()
-        print(f"✓ Funds fetch successful")
-        # print(funds_raw)
+        funds = await broker.get_funds()
+        print(f"✓ Funds mapped: {funds}")
+        assert hasattr(funds, 'available')
 
     except Exception as e:
         print(f"✗ Test failed: {e}")
