@@ -54,18 +54,24 @@ class InstrumentResolver:
         return row[0]
 
     async def _resolve_future(self, instrument: Future) -> str:
+        # instrument.exchange is the underlying's exchange (NSE/BSE), not NFO/BFO.
+        # Join through the underlying to match on what the user actually knows.
         query = """
-            SELECT bt.token FROM instruments i
-            JOIN futures f ON f.instrument_id = i.id
-            JOIN broker_tokens bt ON bt.instrument_id = i.id
-            WHERE i.exchange = ? AND i.symbol = ? AND f.expiry = ? AND bt.broker_id = ?
+            SELECT bt.token
+            FROM instruments fut
+            JOIN futures f        ON f.instrument_id  = fut.id
+            JOIN instruments u    ON u.id             = f.underlying_id
+            JOIN broker_tokens bt ON bt.instrument_id = fut.id
+            WHERE u.exchange = ? AND u.symbol = ? AND f.expiry = ? AND bt.broker_id = ?
         """
         async with self._conn.execute(query, (
             instrument.exchange, instrument.symbol, instrument.expiry.isoformat(), self._broker_id
         )) as cur:
             row = await cur.fetchone()
         if not row:
-            raise InstrumentNotFoundError(f"No future found: {instrument.exchange}:{instrument.symbol} {instrument.expiry}")
+            raise InstrumentNotFoundError(
+                f"No future found: {instrument.exchange}:{instrument.symbol} {instrument.expiry}"
+            )
         return row[0]
 
     async def _resolve_option(self, instrument: Option) -> str:
