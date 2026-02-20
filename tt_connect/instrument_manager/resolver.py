@@ -1,22 +1,34 @@
+from __future__ import annotations
+
+from dataclasses import dataclass
+
 import aiosqlite
 from tt_connect.instruments import Instrument, Index, Equity, Future, Option
 from tt_connect.exceptions import InstrumentNotFoundError
+
+
+@dataclass(frozen=True)
+class ResolvedInstrument:
+    """All broker-specific fields needed to place an order."""
+    token: str          # numeric broker token (symboltoken for AngelOne)
+    broker_symbol: str  # broker's own tradingsymbol (e.g. "NIFTY30MAR26FUT")
+    exchange: str       # exchange on which this instrument trades (NSE, NFO, BSE, BFO)
 
 
 class InstrumentResolver:
     def __init__(self, conn: aiosqlite.Connection, broker_id: str):
         self._conn = conn
         self._broker_id = broker_id
-        self._cache: dict[Instrument, str] = {}
+        self._cache: dict[Instrument, ResolvedInstrument] = {}
 
-    async def resolve(self, instrument: Instrument) -> str:
+    async def resolve(self, instrument: Instrument) -> ResolvedInstrument:
         if instrument in self._cache:
             return self._cache[instrument]
-        token = await self._resolve(instrument)
-        self._cache[instrument] = token
-        return token
+        resolved = await self._resolve(instrument)
+        self._cache[instrument] = resolved
+        return resolved
 
-    async def _resolve(self, instrument: Instrument) -> str:
+    async def _resolve(self, instrument: Instrument) -> ResolvedInstrument:
         if isinstance(instrument, Index):
             return await self._resolve_index(instrument)
         if isinstance(instrument, Equity):
@@ -27,9 +39,10 @@ class InstrumentResolver:
             return await self._resolve_option(instrument)
         raise InstrumentNotFoundError(f"Unsupported instrument type: {type(instrument)}")
 
-    async def _resolve_index(self, instrument: Index) -> str:
+    async def _resolve_index(self, instrument: Index) -> ResolvedInstrument:
         query = """
-            SELECT bt.token FROM instruments i
+            SELECT bt.token, bt.broker_symbol, i.exchange
+            FROM instruments i
             JOIN equities e ON e.instrument_id = i.id
             JOIN broker_tokens bt ON bt.instrument_id = i.id
             WHERE i.exchange = ? AND i.symbol = ? AND i.segment = 'INDICES' AND bt.broker_id = ?
@@ -38,11 +51,12 @@ class InstrumentResolver:
             row = await cur.fetchone()
         if not row:
             raise InstrumentNotFoundError(f"No index found: {instrument.exchange}:{instrument.symbol}")
-        return row[0]
+        return ResolvedInstrument(token=row[0], broker_symbol=row[1], exchange=row[2])
 
-    async def _resolve_equity(self, instrument: Equity) -> str:
+    async def _resolve_equity(self, instrument: Equity) -> ResolvedInstrument:
         query = """
-            SELECT bt.token FROM instruments i
+            SELECT bt.token, bt.broker_symbol, i.exchange
+            FROM instruments i
             JOIN equities e ON e.instrument_id = i.id
             JOIN broker_tokens bt ON bt.instrument_id = i.id
             WHERE i.exchange = ? AND i.symbol = ? AND i.segment != 'INDICES' AND bt.broker_id = ?
@@ -51,13 +65,13 @@ class InstrumentResolver:
             row = await cur.fetchone()
         if not row:
             raise InstrumentNotFoundError(f"No equity found: {instrument.exchange}:{instrument.symbol}")
-        return row[0]
+        return ResolvedInstrument(token=row[0], broker_symbol=row[1], exchange=row[2])
 
-    async def _resolve_future(self, instrument: Future) -> str:
+    async def _resolve_future(self, instrument: Future) -> ResolvedInstrument:
         # instrument.exchange is the underlying's exchange (NSE/BSE), not NFO/BFO.
         # Join through the underlying to match on what the user actually knows.
         query = """
-            SELECT bt.token
+            SELECT bt.token, bt.broker_symbol, fut.exchange
             FROM instruments fut
             JOIN futures f        ON f.instrument_id  = fut.id
             JOIN instruments u    ON u.id             = f.underlying_id
@@ -72,13 +86,13 @@ class InstrumentResolver:
             raise InstrumentNotFoundError(
                 f"No future found: {instrument.exchange}:{instrument.symbol} {instrument.expiry}"
             )
-        return row[0]
+        return ResolvedInstrument(token=row[0], broker_symbol=row[1], exchange=row[2])
 
-    async def _resolve_option(self, instrument: Option) -> str:
+    async def _resolve_option(self, instrument: Option) -> ResolvedInstrument:
         # instrument.exchange is the underlying's exchange (NSE/BSE), not NFO/BFO.
         # Join through the underlying to match on what the user actually knows.
         query = """
-            SELECT bt.token
+            SELECT bt.token, bt.broker_symbol, opt.exchange
             FROM instruments opt
             JOIN options o        ON o.instrument_id  = opt.id
             JOIN instruments u    ON u.id             = o.underlying_id
@@ -96,4 +110,4 @@ class InstrumentResolver:
                 f"No option found: {instrument.exchange}:{instrument.symbol} "
                 f"{instrument.expiry} {instrument.strike}{instrument.option_type}"
             )
-        return row[0]
+        return ResolvedInstrument(token=row[0], broker_symbol=row[1], exchange=row[2])
