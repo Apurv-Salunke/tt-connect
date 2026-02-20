@@ -1,4 +1,3 @@
-from functools import lru_cache
 import aiosqlite
 from tt_connect.instruments import Instrument, Equity, Future, Option
 from tt_connect.exceptions import InstrumentNotFoundError
@@ -8,13 +7,14 @@ class InstrumentResolver:
     def __init__(self, conn: aiosqlite.Connection, broker_id: str):
         self._conn = conn
         self._broker_id = broker_id
+        self._cache: dict[Instrument, str] = {}
 
-    @lru_cache(maxsize=10_000)
-    def resolve(self, instrument: Instrument) -> str:
-        import asyncio
-        return asyncio.get_event_loop().run_until_complete(
-            self._resolve(instrument)
-        )
+    async def resolve(self, instrument: Instrument) -> str:
+        if instrument in self._cache:
+            return self._cache[instrument]
+        token = await self._resolve(instrument)
+        self._cache[instrument] = token
+        return token
 
     async def _resolve(self, instrument: Instrument) -> str:
         if isinstance(instrument, Equity):
@@ -45,7 +45,9 @@ class InstrumentResolver:
             JOIN broker_tokens bt ON bt.instrument_id = i.id
             WHERE i.exchange = ? AND i.symbol = ? AND f.expiry = ? AND bt.broker_id = ?
         """
-        async with self._conn.execute(query, (instrument.exchange, instrument.symbol, instrument.expiry.isoformat(), self._broker_id)) as cur:
+        async with self._conn.execute(query, (
+            instrument.exchange, instrument.symbol, instrument.expiry.isoformat(), self._broker_id
+        )) as cur:
             row = await cur.fetchone()
         if not row:
             raise InstrumentNotFoundError(f"No future found: {instrument.exchange}:{instrument.symbol} {instrument.expiry}")

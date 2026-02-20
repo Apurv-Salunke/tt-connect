@@ -39,6 +39,11 @@ CREATE TABLE IF NOT EXISTS broker_tokens (
     PRIMARY KEY (instrument_id, broker_id)
 );
 
+CREATE TABLE IF NOT EXISTS _meta (
+    key   TEXT PRIMARY KEY,
+    value TEXT NOT NULL
+);
+
 CREATE INDEX IF NOT EXISTS idx_instruments ON instruments(exchange, symbol);
 CREATE INDEX IF NOT EXISTS idx_futures      ON futures(underlying_id, expiry);
 CREATE INDEX IF NOT EXISTS idx_options      ON options(underlying_id, expiry, strike, option_type);
@@ -59,6 +64,6 @@ async def init_schema(conn: aiosqlite.Connection) -> None:
 
 
 async def truncate_all(conn: aiosqlite.Connection) -> None:
-    for table in ("broker_tokens", "equities", "futures", "options", "instruments"):
+    for table in ("broker_tokens", "equities", "futures", "options", "instruments", "_meta"):
         await conn.execute(f"DELETE FROM {table}")
     await conn.commit()

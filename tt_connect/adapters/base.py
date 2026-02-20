@@ -1,9 +1,14 @@
 from __future__ import annotations
 from abc import abstractmethod
-from typing import ClassVar
+from typing import ClassVar, Protocol
 import httpx
 from tt_connect.capabilities import Capabilities
 from tt_connect.exceptions import TTConnectError
+
+
+class BrokerTransformer(Protocol):
+    @staticmethod
+    def parse_error(raw: dict) -> TTConnectError: ...
 
 
 class BrokerAdapter:
@@ -63,6 +68,10 @@ class BrokerAdapter:
     @property
     @abstractmethod
     def capabilities(self) -> Capabilities: ...
+
+    @property
+    @abstractmethod
+    def transformer(self) -> BrokerTransformer: ...
 
     # --- Internal HTTP ---
 

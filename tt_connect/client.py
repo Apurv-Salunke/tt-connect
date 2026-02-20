@@ -1,5 +1,6 @@
 from __future__ import annotations
 import asyncio
+import threading
 from tt_connect.adapters.base import BrokerAdapter
 from tt_connect.enums import Side, ProductType, OrderType, OnStale
 from tt_connect.instruments import Instrument
@@ -28,9 +29,9 @@ class AsyncTTConnect:
             self._broker_id,
         )
 
-    def _resolve(self, instrument: Instrument) -> str:
+    async def _resolve(self, instrument: Instrument) -> str:
         assert self._resolver, "Call await broker.init() first"
-        return self._resolver.resolve(instrument)
+        return await self._resolver.resolve(instrument)
 
     # --- Profile & Funds ---
 
@@ -65,7 +66,7 @@ class AsyncTTConnect:
         trigger_price: float | None = None,
     ) -> str:
         self._adapter.capabilities.verify(instrument, order_type, product)
-        token = self._resolve(instrument)
+        token = await self._resolve(instrument)
         params = self._adapter.transformer.to_order_params(
             token, qty, side, product, order_type, price, trigger_price
         )
@@ -101,37 +102,43 @@ class AsyncTTConnect:
 
 class TTConnect:
     def __init__(self, broker: str, config: dict):
+        self._loop = asyncio.new_event_loop()
+        self._thread = threading.Thread(target=self._loop.run_forever, daemon=True)
+        self._thread.start()
         self._async = AsyncTTConnect(broker, config)
-        asyncio.run(self._async.init())
+        self._run(self._async.init())
+
+    def _run(self, coro):
+        return asyncio.run_coroutine_threadsafe(coro, self._loop).result()
 
     def get_profile(self) -> Profile:
-        return asyncio.run(self._async.get_profile())
+        return self._run(self._async.get_profile())
 
     def get_funds(self) -> Fund:
-        return asyncio.run(self._async.get_funds())
+        return self._run(self._async.get_funds())
 
     def get_holdings(self) -> list[Holding]:
-        return asyncio.run(self._async.get_holdings())
+        return self._run(self._async.get_holdings())
 
     def get_positions(self) -> list[Position]:
-        return asyncio.run(self._async.get_positions())
+        return self._run(self._async.get_positions())
 
     def place_order(self, instrument: Instrument, qty: int, side: Side,
                     product: ProductType, order_type: OrderType,
                     price: float | None = None,
                     trigger_price: float | None = None) -> str:
-        return asyncio.run(self._async.place_order(
+        return self._run(self._async.place_order(
             instrument, qty, side, product, order_type, price, trigger_price
         ))
 
     def modify_order(self, order_id: str, **kwargs) -> None:
-        asyncio.run(self._async.modify_order(order_id, **kwargs))
+        self._run(self._async.modify_order(order_id, **kwargs))
 
     def cancel_order(self, order_id: str) -> None:
-        asyncio.run(self._async.cancel_order(order_id))
+        self._run(self._async.cancel_order(order_id))
 
     def get_order(self, order_id: str) -> Order:
-        return asyncio.run(self._async.get_order(order_id))
+        return self._run(self._async.get_order(order_id))
 
     def get_orders(self) -> list[Order]:
-        return asyncio.run(self._async.get_orders())
+        return self._run(self._async.get_orders())

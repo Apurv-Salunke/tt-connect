@@ -6,6 +6,7 @@ from tt_connect.instruments import Instrument
 
 @dataclass(frozen=True)
 class Capabilities:
+    broker_id: str
     segments: frozenset[Exchange]
     order_types: frozenset[OrderType]
     product_types: frozenset[ProductType]
@@ -18,13 +19,13 @@ class Capabilities:
     ) -> None:
         if instrument.exchange not in self.segments:
             raise UnsupportedFeatureError(
-                f"{self.__class__.__name__} does not support {instrument.exchange} segment"
+                f"{self.broker_id} does not support {instrument.exchange} segment"
             )
         if order_type not in self.order_types:
             raise UnsupportedFeatureError(
-                f"{self.__class__.__name__} does not support {order_type} order type"
+                f"{self.broker_id} does not support {order_type} order type"
             )
         if product_type not in self.product_types:
             raise UnsupportedFeatureError(
-                f"{self.__class__.__name__} does not support {product_type} product type"
+                f"{self.broker_id} does not support {product_type} product type"
             )
