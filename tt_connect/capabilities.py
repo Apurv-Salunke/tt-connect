@@ -1,7 +1,7 @@
 from dataclasses import dataclass
 from tt_connect.enums import Exchange, OrderType, ProductType
 from tt_connect.exceptions import UnsupportedFeatureError
-from tt_connect.instruments import Instrument
+from tt_connect.instruments import Instrument, Index
 
 
 @dataclass(frozen=True)
@@ -17,6 +17,10 @@ class Capabilities:
         order_type: OrderType,
         product_type: ProductType,
     ) -> None:
+        if isinstance(instrument, Index):
+            raise UnsupportedFeatureError(
+                f"Indices are not tradeable. Use Equity, Future, or Option instead."
+            )
         if instrument.exchange not in self.segments:
             raise UnsupportedFeatureError(
                 f"{self.broker_id} does not support {instrument.exchange} segment"

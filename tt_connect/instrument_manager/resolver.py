@@ -1,5 +1,5 @@
 import aiosqlite
-from tt_connect.instruments import Instrument, Equity, Future, Option
+from tt_connect.instruments import Instrument, Index, Equity, Future, Option
 from tt_connect.exceptions import InstrumentNotFoundError
 
 
@@ -17,6 +17,8 @@ class InstrumentResolver:
         return token
 
     async def _resolve(self, instrument: Instrument) -> str:
+        if isinstance(instrument, Index):
+            return await self._resolve_index(instrument)
         if isinstance(instrument, Equity):
             return await self._resolve_equity(instrument)
         if isinstance(instrument, Future):
@@ -25,12 +27,25 @@ class InstrumentResolver:
             return await self._resolve_option(instrument)
         raise InstrumentNotFoundError(f"Unsupported instrument type: {type(instrument)}")
 
+    async def _resolve_index(self, instrument: Index) -> str:
+        query = """
+            SELECT bt.token FROM instruments i
+            JOIN equities e ON e.instrument_id = i.id
+            JOIN broker_tokens bt ON bt.instrument_id = i.id
+            WHERE i.exchange = ? AND i.symbol = ? AND i.segment = 'INDICES' AND bt.broker_id = ?
+        """
+        async with self._conn.execute(query, (instrument.exchange, instrument.symbol, self._broker_id)) as cur:
+            row = await cur.fetchone()
+        if not row:
+            raise InstrumentNotFoundError(f"No index found: {instrument.exchange}:{instrument.symbol}")
+        return row[0]
+
     async def _resolve_equity(self, instrument: Equity) -> str:
         query = """
             SELECT bt.token FROM instruments i
             JOIN equities e ON e.instrument_id = i.id
             JOIN broker_tokens bt ON bt.instrument_id = i.id
-            WHERE i.exchange = ? AND i.symbol = ? AND bt.broker_id = ?
+            WHERE i.exchange = ? AND i.symbol = ? AND i.segment != 'INDICES' AND bt.broker_id = ?
         """
         async with self._conn.execute(query, (instrument.exchange, instrument.symbol, self._broker_id)) as cur:
             row = await cur.fetchone()

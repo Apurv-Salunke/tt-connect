@@ -30,11 +30,87 @@ class InstrumentManager:
 
     async def refresh(self, fetch_fn) -> None:
         logger.info(f"Refreshing instruments for {self._broker_id}")
-        raw = await fetch_fn()
+        parsed = await fetch_fn()
         await truncate_all(self._conn)
-        await self._insert(raw)
+        await self._insert(parsed)
         await self._set_last_updated()
         logger.info("Instrument refresh complete")
+
+    async def _insert(self, parsed) -> None:
+        # Chunk 1: indices — must go in before futures/options reference them
+        await self._insert_indices(parsed.indices)
+
+        # Chunk 2: equities
+        await self._insert_equities(parsed.equities)
+
+        # Chunk 3: futures   — coming soon
+        # Chunk 4: options   — coming soon
+
+        await self._conn.commit()
+
+    async def _insert_indices(self, indices) -> None:
+        if not indices:
+            return
+
+        logger.info(f"Inserting {len(indices)} indices")
+
+        for idx in indices:
+            # 1. Base instrument record
+            cursor = await self._conn.execute(
+                """
+                INSERT INTO instruments (exchange, symbol, segment, name, lot_size, tick_size)
+                VALUES (?, ?, ?, ?, ?, ?)
+                """,
+                (idx.exchange, idx.symbol, idx.segment, idx.name, idx.lot_size, idx.tick_size),
+            )
+            instrument_id = cursor.lastrowid
+
+            # 2. Equities sub-table (indices have no ISIN)
+            await self._conn.execute(
+                "INSERT INTO equities (instrument_id, isin) VALUES (?, NULL)",
+                (instrument_id,),
+            )
+
+            # 3. Broker token
+            await self._conn.execute(
+                """
+                INSERT INTO broker_tokens (instrument_id, broker_id, token, broker_symbol)
+                VALUES (?, ?, ?, ?)
+                """,
+                (instrument_id, self._broker_id, idx.broker_token, idx.broker_symbol),
+            )
+
+    async def _insert_equities(self, equities) -> None:
+        if not equities:
+            return
+
+        logger.info(f"Inserting {len(equities)} equities")
+
+        for eq in equities:
+            # 1. Base instrument record
+            cursor = await self._conn.execute(
+                """
+                INSERT INTO instruments (exchange, symbol, segment, name, lot_size, tick_size)
+                VALUES (?, ?, ?, ?, ?, ?)
+                """,
+                (eq.exchange, eq.symbol, eq.segment, eq.name, eq.lot_size, eq.tick_size),
+            )
+            instrument_id = cursor.lastrowid
+
+            # 2. Equities sub-table (Zerodha CSV has no ISIN)
+            await self._conn.execute(
+                "INSERT INTO equities (instrument_id, isin) VALUES (?, NULL)",
+                (instrument_id,),
+            )
+
+            # 3. Broker token
+            await self._conn.execute(
+                """
+                INSERT INTO broker_tokens (instrument_id, broker_id, token, broker_symbol)
+                VALUES (?, ?, ?, ?)
+                """,
+                (instrument_id, self._broker_id, eq.broker_token, eq.broker_symbol),
+            )
 
     async def _is_stale(self) -> bool:
         async with self._conn.execute(
@@ -51,10 +127,6 @@ class InstrumentManager:
             (date.today().isoformat(),),
         )
         await self._conn.commit()
-
-    async def _insert(self, raw: list[dict]) -> None:
-        # Implemented per broker via fetch_fn contract
-        pass
 
     @property
     def connection(self) -> aiosqlite.Connection:
