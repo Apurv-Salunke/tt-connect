@@ -20,6 +20,10 @@ _RETRY_BACKOFF = 1.0  # seconds; doubled on each attempt
 class BrokerTransformer(Protocol):
     @staticmethod
     def parse_error(raw: dict) -> TTConnectError: ...
+    @staticmethod
+    def to_order_id(raw: dict) -> str: ...
+    @staticmethod
+    def to_close_position_params(pos_raw: dict, qty: int, side) -> dict: ...
 
 
 class BrokerAdapter:

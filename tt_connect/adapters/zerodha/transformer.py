@@ -35,22 +35,40 @@ class ZerodhaTransformer:
     # --- Outgoing ---
 
     @staticmethod
-    def to_order_params(instrument_token: str, qty: int, side: Side,
-                        product: ProductType, order_type: OrderType,
-                        price: float | None, trigger_price: float | None) -> dict:
+    def to_order_params(token: str, broker_symbol: str, exchange: str,
+                        qty: int, side: Side, product: ProductType,
+                        order_type: OrderType, price: float | None,
+                        trigger_price: float | None) -> dict:
         params = {
-            "tradingsymbol": instrument_token,
+            "tradingsymbol": broker_symbol,
+            "exchange":       exchange,
             "transaction_type": side.value,
-            "quantity": qty,
-            "product": product.value,
-            "order_type": order_type.value,
-            "validity": "DAY",
+            "quantity":       qty,
+            "product":        product.value,
+            "order_type":     order_type.value,
+            "validity":       "DAY",
         }
         if price:
             params["price"] = price
         if trigger_price:
             params["trigger_price"] = trigger_price
         return params
+
+    @staticmethod
+    def to_order_id(raw: dict) -> str:
+        return raw["data"]["order_id"]
+
+    @staticmethod
+    def to_close_position_params(pos_raw: dict, qty: int, side: Side) -> dict:
+        return {
+            "tradingsymbol":    pos_raw["tradingsymbol"],
+            "exchange":         pos_raw["exchange"],
+            "transaction_type": side.value,
+            "quantity":         qty,
+            "product":          pos_raw["product"],
+            "order_type":       "MARKET",
+            "validity":         "DAY",
+        }
 
     # --- Incoming ---
 

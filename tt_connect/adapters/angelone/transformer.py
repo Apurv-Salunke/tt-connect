@@ -119,7 +119,9 @@ class AngelOneTransformer:
 
     @staticmethod
     def to_order_params(
-        instrument_token: str,
+        token: str,
+        broker_symbol: str,
+        exchange: str,
         qty: int,
         side: Side,
         product: ProductType,
@@ -127,16 +129,11 @@ class AngelOneTransformer:
         price: float | None,
         trigger_price: float | None,
     ) -> dict:
-        # NOTE: AngelOne requires both symboltoken (numeric) and tradingsymbol.
-        # instrument_token here is the broker_token (numeric string from resolver).
-        # tradingsymbol is set to instrument_token as a fallback; callers that
-        # pass the broker_symbol directly (e.g. close_all_positions) will work
-        # correctly. Full instrument resolution (token + symbol + exchange) is
-        # a resolver-level improvement tracked in PLAN.md.
         params: dict = {
             "variety":         "NORMAL",
-            "symboltoken":     instrument_token,
-            "tradingsymbol":   instrument_token,   # overridden when broker_symbol is passed
+            "symboltoken":     token,
+            "tradingsymbol":   broker_symbol,
+            "exchange":        exchange,
             "transactiontype": side.value,
             "ordertype":       order_type.value,
             "producttype":     product.value,
@@ -149,6 +146,27 @@ class AngelOneTransformer:
         if trigger_price:
             params["triggerprice"] = str(trigger_price)
         return params
+
+    @staticmethod
+    def to_order_id(raw: dict) -> str:
+        return raw["data"]["orderid"]
+
+    @staticmethod
+    def to_close_position_params(pos_raw: dict, qty: int, side: Side) -> dict:
+        return {
+            "variety":         "NORMAL",
+            "symboltoken":     pos_raw.get("symboltoken", ""),
+            "tradingsymbol":   pos_raw["tradingsymbol"],
+            "exchange":        pos_raw["exchange"],
+            "transactiontype": side.value,
+            "ordertype":       "MARKET",
+            "producttype":     pos_raw["producttype"],
+            "duration":        "DAY",
+            "quantity":        str(qty),
+            "price":           "0",
+            "squareoff":       "0",
+            "stoploss":        "0",
+        }
 
     # --- Incoming ---
 

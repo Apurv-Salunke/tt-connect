@@ -2,7 +2,7 @@ from __future__ import annotations
 import asyncio
 import threading
 from tt_connect.adapters.base import BrokerAdapter
-from tt_connect.enums import Side, ProductType, OrderType, OnStale
+from tt_connect.enums import Side, ProductType, OrderType, OrderStatus, OnStale
 from tt_connect.instruments import Instrument
 from tt_connect.instrument_manager.manager import InstrumentManager
 from tt_connect.instrument_manager.resolver import InstrumentResolver
@@ -33,7 +33,7 @@ class AsyncTTConnect:
         await self._instrument_manager.connection.close()
         await self._adapter._client.aclose()
 
-    async def _resolve(self, instrument: Instrument) -> str:
+    async def _resolve(self, instrument: Instrument):
         assert self._resolver, "Call await broker.init() first"
         return await self._resolver.resolve(instrument)
 
@@ -76,12 +76,13 @@ class AsyncTTConnect:
         trigger_price: float | None = None,
     ) -> str:
         self._adapter.capabilities.verify(instrument, order_type, product)
-        token = await self._resolve(instrument)
+        resolved = await self._resolve(instrument)
         params = self._adapter.transformer.to_order_params(
-            token, qty, side, product, order_type, price, trigger_price
+            resolved.token, resolved.broker_symbol, resolved.exchange,
+            qty, side, product, order_type, price, trigger_price,
         )
         raw = await self._adapter.place_order(params)
-        return raw["data"]["order_id"]
+        return self._adapter.transformer.to_order_id(raw)
 
     async def modify_order(self, order_id: str, **kwargs) -> None:
         await self._adapter.modify_order(order_id, kwargs)
@@ -91,20 +92,18 @@ class AsyncTTConnect:
 
     async def cancel_all_orders(self) -> tuple[list[str], list[str]]:
         """Cancel every open order. Returns (cancelled_ids, failed_ids)."""
-        raw = await self._adapter.get_orders()
-        open_statuses = {"OPEN", "TRIGGER PENDING", "AMO REQ RECEIVED",
-                         "MODIFY PENDING", "OPEN PENDING", "CANCEL PENDING",
-                         "VALIDATION PENDING"}
-        open_orders = [o for o in raw["data"] if o["status"] in open_statuses]
-
+        orders = await self.get_orders()
+        open_orders = [
+            o for o in orders
+            if o.status in {OrderStatus.OPEN, OrderStatus.PENDING}
+        ]
         cancelled, failed = [], []
         for order in open_orders:
-            oid = order["order_id"]
             try:
-                await self._adapter.cancel_order(oid)
-                cancelled.append(oid)
+                await self._adapter.cancel_order(order.id)
+                cancelled.append(order.id)
             except Exception:
-                failed.append(oid)
+                failed.append(order.id)
         return cancelled, failed
 
     async def close_all_positions(self) -> tuple[list[str], list[str]]:
@@ -114,25 +113,19 @@ class AsyncTTConnect:
         """
         raw = await self._adapter.get_positions()
         placed, failed = [], []
-        for pos in raw["data"]:
-            qty = pos["quantity"]
-            if qty == 0:
+        for pos_raw in raw["data"]:
+            position = self._adapter.transformer.to_position(pos_raw)
+            if position.qty == 0:
                 continue
-            side = Side.SELL if qty > 0 else Side.BUY
-            params = self._adapter.transformer.to_order_params(
-                instrument_token=pos["tradingsymbol"],
-                qty=abs(qty),
-                side=side,
-                product=ProductType(pos["product"]),
-                order_type=OrderType.MARKET,
-                price=None,
-                trigger_price=None,
+            side = Side.SELL if position.qty > 0 else Side.BUY
+            params = self._adapter.transformer.to_close_position_params(
+                pos_raw, abs(position.qty), side
             )
             try:
                 result = await self._adapter.place_order(params)
-                placed.append(result["data"]["order_id"])
+                placed.append(self._adapter.transformer.to_order_id(result))
             except Exception:
-                failed.append(pos["tradingsymbol"])
+                failed.append(pos_raw.get("tradingsymbol", "unknown"))
         return placed, failed
 
     async def get_order(self, order_id: str) -> Order:
