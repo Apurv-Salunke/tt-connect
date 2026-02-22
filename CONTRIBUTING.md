@@ -39,15 +39,15 @@ Every PR should include:
 
 ## Local Developer Commands
 
-These shortcuts are defined in `pyproject.toml`:
+Use `make` targets from `connect/`:
 
-- `poetry run tt-lint`
-- `poetry run tt-typecheck`
-- `poetry run tt-test`
-- `poetry run tt-test-fast`
-- `poetry run tt-coverage`
-- `poetry run tt-precommit-install`
-- `poetry run tt-precommit-run`
+- `make lint`
+- `make typecheck`
+- `make test`
+- `make test-fast`
+- `make coverage`
+- `make precommit-install`
+- `make precommit-run`
 
 ## Branch Protection Settings (GitHub)
 

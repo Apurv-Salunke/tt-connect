@@ -51,10 +51,10 @@ jobs:
         run: poetry install --with dev
 
       - name: Ruff
-        run: poetry run ruff check .
+        run: make lint
 
       - name: MyPy
-        run: poetry run mypy tt_connect/
+        run: make typecheck
 
   test:
     runs-on: ubuntu-latest
@@ -76,7 +76,7 @@ jobs:
         run: poetry install --with dev
 
       - name: Run Unit + Integration Tests
-        run: poetry run pytest
+        run: make test
 
   coverage_gate:
     runs-on: ubuntu-latest
@@ -98,7 +98,7 @@ jobs:
         run: poetry install --with dev
 
       - name: Coverage Gate
-        run: poetry run pytest tests/unit tests/integration --cov=tt_connect --cov-report=xml --cov-fail-under=64
+        run: make coverage
 
       - name: Upload Coverage XML
         uses: actions/upload-artifact@v4
