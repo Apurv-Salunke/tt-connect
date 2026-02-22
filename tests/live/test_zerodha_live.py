@@ -1,5 +1,4 @@
 import pytest
-from tt_connect.instruments import Future, Exchange
 
 @pytest.mark.live
 async def test_profile_returns_real_client_id(broker):

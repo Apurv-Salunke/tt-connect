@@ -1,9 +1,11 @@
-import pytest
-import aiosqlite
+from datetime import date, timedelta
+from unittest.mock import AsyncMock
+
 from tt_connect.instrument_manager.manager import InstrumentManager
 from tt_connect.adapters.zerodha.parser import parse
 from tt_connect.enums import OnStale
 from tt_connect.instrument_manager.db import truncate_all
+from freezegun import freeze_time
 
 async def _count(db, table: str) -> int:
     async with db.execute(f"SELECT COUNT(*) FROM {table}") as cur:
@@ -49,10 +51,6 @@ async def test_idempotent_insert(db, zerodha_csv):
 
     assert first_count == second_count
     assert first_count == 12
-
-from unittest.mock import AsyncMock
-from datetime import date, timedelta
-from freezegun import freeze_time
 
 async def test_is_stale_behavior(db):
     manager = InstrumentManager(broker_id="zerodha")

@@ -93,9 +93,9 @@ if not USE_AUTO_MODE and not ACCESS_TOKEN:
 # tt-connect: the public API
 # ---------------------------------------------------------------------------
 
-from tt_connect import TTConnect                                     # noqa: E402
-from tt_connect.instruments import Index, Equity, Future, Option    # noqa: E402
-from tt_connect.enums import Exchange, OptionType, Side, ProductType, OrderType  # noqa: E402
+from tt_connect import TTConnect  # noqa: E402
+from tt_connect.instruments import Index, Equity, Future, Option  # noqa: E402
+from tt_connect.enums import Exchange, OptionType  # noqa: E402
 
 # ---------------------------------------------------------------------------
 # Auth mode A: AUTO (default for AngelOne)
