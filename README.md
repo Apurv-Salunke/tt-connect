@@ -39,7 +39,7 @@ poetry run mypy tt_connect/
 
 Before using this project for live trading, read:
 
-- `DISCLAIMER.md`
-- `SECURITY.md`
-- `COMPLIANCE.md`
-- `TRADEMARK.md`
+- [DISCLAIMER.md](./DISCLAIMER.md)
+- [SECURITY.md](./SECURITY.md)
+- [COMPLIANCE.md](./COMPLIANCE.md)
+- [TRADEMARK.md](./TRADEMARK.md)
