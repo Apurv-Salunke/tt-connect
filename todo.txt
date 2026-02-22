@@ -1,7 +1,7 @@
 # tt-connect Production Hardening TODO (Source of Truth)
 
 - [ ] Release governance: add semver/release policy, changelog workflow, and tag-based publish pipeline.
-- [x] Trust/compliance files: add `LICENSE`, `SECURITY.md`, and `CODEOWNERS`.
+- [ ] Trust/compliance files: add `LICENSE`, `SECURITY.md`, and `CODEOWNERS`.
 - [ ] Security hardening in CI: add dependency vulnerability scans, secret scanning, and SAST.
 - [ ] Broker live-test coverage: add AngelOne live tests alongside Zerodha.
 - [ ] Feature parity: implement and validate `calculate_margin(...)`.
