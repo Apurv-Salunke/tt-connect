@@ -26,6 +26,7 @@ Every PR should include:
 1. Problem and change summary.
 2. Test evidence (commands run, output summary).
 3. Any risk/rollback notes.
+4. `CHANGELOG.md` update for user-visible changes to code, behavior, or APIs.
 
 ## CI Policy
 
