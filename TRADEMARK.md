@@ -1,6 +1,6 @@
 # Trademark Policy
 
-`Tiny Traders`, `tt-connect`, associated logos, and branding are trademarks of the project owners.
+`Tiny Traders™`, `tt-connect™`, associated logos, and branding are trademarks of the project owners. (™ indicates an unregistered/common-law trademark.)
 
 ## Allowed Use
 
