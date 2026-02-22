@@ -1,30 +1,33 @@
 from __future__ import annotations
+
+from abc import abstractmethod
 from typing import Callable, Awaitable
+
 from tt_connect.instruments import Instrument
 from tt_connect.models import Tick
 
-
+# Callback type: async function that receives a Tick
 OnTick = Callable[[Tick], Awaitable[None]]
 
 
-class WebSocketClient:
-    def __init__(self, broker_id: str, auth):
-        self._broker_id = broker_id
-        self._auth = auth
+class BrokerWebSocket:
+    """Abstract interface for broker-specific streaming implementations."""
 
+    @abstractmethod
     async def subscribe(
         self,
-        instruments: list[Instrument],
+        subscriptions: list[tuple[Instrument, object]],  # (Instrument, ResolvedInstrument)
         on_tick: OnTick,
-        on_order_update: OnTick | None = None,
     ) -> None:
-        raise NotImplementedError
+        """Start or extend subscriptions and emit normalized ticks via callback."""
+        ...
 
+    @abstractmethod
     async def unsubscribe(self, instruments: list[Instrument]) -> None:
-        raise NotImplementedError
+        """Remove subscriptions for the provided canonical instruments."""
+        ...
 
-    async def _connect(self) -> None:
-        raise NotImplementedError
-
-    async def _reconnect(self) -> None:
-        raise NotImplementedError
+    @abstractmethod
+    async def close(self) -> None:
+        """Close socket connection and release broker-stream resources."""
+        ...
