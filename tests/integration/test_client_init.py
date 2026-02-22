@@ -1,7 +1,6 @@
 import pytest
 import respx
 import httpx
-from pathlib import Path
 from tt_connect.client import AsyncTTConnect
 from tt_connect.instruments import Equity
 from tt_connect.enums import Exchange, Side, ProductType, OrderType

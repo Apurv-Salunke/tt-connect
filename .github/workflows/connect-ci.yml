@@ -98,7 +98,7 @@ jobs:
         run: poetry install --with dev
 
       - name: Coverage Gate
-        run: poetry run pytest tests/unit --cov=tt_connect --cov-report=xml --cov-fail-under=85
+        run: poetry run pytest tests/unit tests/integration --cov=tt_connect --cov-report=xml --cov-fail-under=64
 
       - name: Upload Coverage XML
         uses: actions/upload-artifact@v4

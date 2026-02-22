@@ -1,6 +1,6 @@
 import pytest
 from pydantic import ValidationError
-from tt_connect.models import Profile, Fund, Holding, Position, Order, Trade, Margin
+from tt_connect.models import Profile, Fund, Holding, Order, Margin
 from tt_connect.instruments import Instrument
 from tt_connect.enums import Exchange, Side, ProductType, OrderType, OrderStatus
 

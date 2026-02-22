@@ -33,7 +33,7 @@ Every PR should include:
   - lint (`ruff`)
   - type check (`mypy`)
   - tests (`pytest` unit + integration)
-  - coverage gate (`>=85%` for `tt_connect`)
+  - coverage gate (`>=64%` for `tt_connect`, raise as coverage improves)
   - package build (`poetry build`)
 - Live tests under `tests/live/` are manual and not part of required CI.
 

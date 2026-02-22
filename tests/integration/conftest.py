@@ -1,5 +1,4 @@
 import aiosqlite
-import pytest
 import pytest_asyncio
 from tt_connect.instrument_manager.db import init_schema
 from tt_connect.instrument_manager.manager import InstrumentManager
