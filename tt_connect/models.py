@@ -6,6 +6,8 @@ from tt_connect.instruments import Instrument
 
 
 class Profile(BaseModel):
+    """Normalized broker account profile."""
+
     model_config = ConfigDict(frozen=True)
 
     client_id: str
@@ -15,6 +17,8 @@ class Profile(BaseModel):
 
 
 class Fund(BaseModel):
+    """Normalized funds/margin summary."""
+
     model_config = ConfigDict(frozen=True)
 
     available: float
@@ -26,6 +30,8 @@ class Fund(BaseModel):
 
 
 class Holding(BaseModel):
+    """Normalized demat holding record."""
+
     model_config = ConfigDict(frozen=True)
 
     instrument: Instrument
@@ -37,6 +43,8 @@ class Holding(BaseModel):
 
 
 class Position(BaseModel):
+    """Normalized open position record."""
+
     model_config = ConfigDict(frozen=True)
 
     instrument: Instrument
@@ -48,6 +56,8 @@ class Position(BaseModel):
 
 
 class Order(BaseModel):
+    """Normalized order record."""
+
     model_config = ConfigDict(frozen=True)
 
     id: str
@@ -65,6 +75,8 @@ class Order(BaseModel):
 
 
 class Trade(BaseModel):
+    """Normalized trade-book entry."""
+
     model_config = ConfigDict(frozen=True)
 
     order_id: str
@@ -78,6 +90,8 @@ class Trade(BaseModel):
 
 
 class Margin(BaseModel):
+    """Normalized margin estimation result."""
+
     model_config = ConfigDict(frozen=True)
 
     total: float            # initial total margin required
@@ -89,6 +103,8 @@ class Margin(BaseModel):
 
 
 class Tick(BaseModel):
+    """Normalized streaming market data tick."""
+
     model_config = ConfigDict(frozen=True)
 
     instrument: Instrument

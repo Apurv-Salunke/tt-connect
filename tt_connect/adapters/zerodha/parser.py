@@ -24,6 +24,8 @@ from datetime import date
 
 @dataclass(frozen=True)
 class ParsedIndex:
+    """Parsed canonical index row from Zerodha CSV."""
+
     exchange: str
     symbol: str         # canonical — what users write in their code
     broker_symbol: str  # Zerodha's tradingsymbol
@@ -36,6 +38,8 @@ class ParsedIndex:
 
 @dataclass(frozen=True)
 class ParsedEquity:
+    """Parsed canonical equity row from Zerodha CSV."""
+
     exchange: str
     symbol: str         # canonical — same as broker_symbol for equities
     broker_symbol: str  # Zerodha's tradingsymbol
@@ -48,6 +52,8 @@ class ParsedEquity:
 
 @dataclass(frozen=True)
 class ParsedFuture:
+    """Parsed canonical futures row from Zerodha CSV."""
+
     exchange: str             # NFO or BFO (the derivative exchange, stored in DB)
     symbol: str               # underlying canonical name — e.g. "NIFTY", "RELIANCE"
     broker_symbol: str        # Zerodha's tradingsymbol — e.g. "NIFTY26FEBFUT"
@@ -61,6 +67,8 @@ class ParsedFuture:
 
 @dataclass(frozen=True)
 class ParsedOption:
+    """Parsed canonical options row from Zerodha CSV."""
+
     exchange: str             # NFO or BFO (the derivative exchange, stored in DB)
     symbol: str               # underlying canonical name — e.g. "NIFTY", "RELIANCE"
     broker_symbol: str        # Zerodha's tradingsymbol — e.g. "NIFTY26FEB23000CE"
@@ -76,6 +84,8 @@ class ParsedOption:
 
 @dataclass
 class ParsedInstruments:
+    """Container for all parsed instrument groups."""
+
     indices:  list[ParsedIndex]  = field(default_factory=list)
     equities: list[ParsedEquity] = field(default_factory=list)
     futures:  list[ParsedFuture] = field(default_factory=list)
@@ -172,6 +182,7 @@ _BROKER_TO_CANONICAL: dict[str, str] = {v[1]: k for k, v in INDEX_NAME_MAP.items
 
 
 def _parse_index(row: dict) -> ParsedIndex:
+    """Parse one index row."""
     broker_symbol = row["tradingsymbol"]
     canonical_symbol = _BROKER_TO_CANONICAL.get(broker_symbol, broker_symbol)
 
@@ -188,6 +199,7 @@ def _parse_index(row: dict) -> ParsedIndex:
 
 
 def _parse_equity(row: dict) -> ParsedEquity:
+    """Parse one equity row."""
     symbol = row["tradingsymbol"]
 
     return ParsedEquity(
@@ -203,6 +215,7 @@ def _parse_equity(row: dict) -> ParsedEquity:
 
 
 def _parse_future(row: dict) -> ParsedFuture:
+    """Parse one futures row."""
     exchange = row["exchange"]
 
     return ParsedFuture(
@@ -219,6 +232,7 @@ def _parse_future(row: dict) -> ParsedFuture:
 
 
 def _parse_option(row: dict) -> ParsedOption:
+    """Parse one options row."""
     exchange = row["exchange"]
 
     return ParsedOption(

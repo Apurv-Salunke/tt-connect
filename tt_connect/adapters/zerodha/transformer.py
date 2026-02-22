@@ -1,3 +1,5 @@
+"""Zerodha request/response normalization helpers."""
+
 from datetime import datetime
 from tt_connect.models import Profile, Fund, Holding, Position, Order, Trade, Margin, Tick
 from tt_connect.instruments import Instrument
@@ -31,6 +33,7 @@ _ORDER_STATUS_MAP: dict[str, OrderStatus] = {
 
 
 class ZerodhaTransformer:
+    """Transforms Zerodha raw payloads to/from canonical tt-connect models."""
 
     # --- Outgoing ---
 
@@ -39,6 +42,7 @@ class ZerodhaTransformer:
                         qty: int, side: Side, product: ProductType,
                         order_type: OrderType, price: float | None,
                         trigger_price: float | None) -> dict:
+        """Build Zerodha order placement payload from canonical arguments."""
         params = {
             "tradingsymbol": broker_symbol,
             "exchange":       exchange,
@@ -56,10 +60,12 @@ class ZerodhaTransformer:
 
     @staticmethod
     def to_order_id(raw: dict) -> str:
+        """Extract order id from successful place/modify responses."""
         return raw["data"]["order_id"]
 
     @staticmethod
     def to_close_position_params(pos_raw: dict, qty: int, side: Side) -> dict:
+        """Build market-order payload used to offset an open position."""
         return {
             "tradingsymbol":    pos_raw["tradingsymbol"],
             "exchange":         pos_raw["exchange"],
@@ -74,6 +80,7 @@ class ZerodhaTransformer:
 
     @staticmethod
     def to_profile(raw: dict) -> Profile:
+        """Normalize profile payload."""
         return Profile(
             client_id=raw["user_id"],
             name=raw["user_name"],
@@ -83,6 +90,7 @@ class ZerodhaTransformer:
 
     @staticmethod
     def to_fund(raw: dict) -> Fund:
+        """Normalize funds/margins payload."""
         equity = raw["equity"]
         return Fund(
             available=equity["available"]["live_balance"],
@@ -95,6 +103,7 @@ class ZerodhaTransformer:
 
     @staticmethod
     def to_holding(raw: dict) -> Holding:
+        """Normalize holding row and compute pnl percentage."""
         avg = raw["average_price"]
         ltp = raw["last_price"]
         pnl_pct = round((ltp - avg) / avg * 100, 2) if avg else 0.0
@@ -112,6 +121,7 @@ class ZerodhaTransformer:
 
     @staticmethod
     def to_position(raw: dict) -> Position:
+        """Normalize net position row."""
         return Position(
             instrument=Instrument(
                 exchange=Exchange(raw["exchange"]),
@@ -126,6 +136,7 @@ class ZerodhaTransformer:
 
     @staticmethod
     def to_trade(raw: dict) -> Trade:
+        """Normalize trade-book row."""
         ts = raw.get("fill_timestamp") or raw.get("order_timestamp")
         return Trade(
             order_id=raw["order_id"],
@@ -143,6 +154,7 @@ class ZerodhaTransformer:
 
     @staticmethod
     def to_order(raw: dict, instrument=None) -> Order:
+        """Normalize order-book row with status mapping."""
         status = _ORDER_STATUS_MAP.get(raw["status"], OrderStatus.PENDING)
         ts = raw.get("order_timestamp") or raw.get("exchange_timestamp")
         return Order(
@@ -162,6 +174,7 @@ class ZerodhaTransformer:
 
     @staticmethod
     def to_margin(raw: dict) -> Margin:
+        """Normalize basket margin response."""
         initial = raw["initial"]
         final   = raw["final"]
         total   = initial["total"]
@@ -179,6 +192,7 @@ class ZerodhaTransformer:
 
     @staticmethod
     def parse_error(raw: dict) -> TTConnectError:
+        """Map broker error envelope to canonical exception types."""
         code = raw.get("error_type", "")
         message = raw.get("message", "Unknown error")
         exc_class = ERROR_MAP.get(code, BrokerError)
