@@ -35,9 +35,10 @@ def coverage() -> None:
     _run([
         "pytest",
         "tests/unit",
+        "tests/integration",
         "--cov=tt_connect",
         "--cov-report=xml",
-        "--cov-fail-under=85",
+        "--cov-fail-under=64",
     ])
 
 

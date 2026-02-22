@@ -68,9 +68,9 @@ if not API_KEY or not ACCESS_TOKEN:
 # tt-connect: the public API
 # ---------------------------------------------------------------------------
 
-from tt_connect import TTConnect
-from tt_connect.instruments import Index, Equity, Future, Option
-from tt_connect.enums import Exchange, OptionType, Side, ProductType, OrderType
+from tt_connect import TTConnect  # noqa: E402
+from tt_connect.instruments import Index, Equity, Future, Option  # noqa: E402
+from tt_connect.enums import Exchange, OptionType  # noqa: E402
 
 broker = TTConnect(
     "zerodha",
@@ -270,8 +270,6 @@ print()
 #
 # (Note: Zerodha WebSockets are not yet implemented in tt-connect)
 # ---------------------------------------------------------------------------
-
-import asyncio
 
 async def run_async_demo() -> None:
     print("── Async API ───────────────────────────")
