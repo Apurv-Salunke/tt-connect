@@ -45,7 +45,7 @@ with TTConnect("zerodha", {"api_key": "...", "access_token": "..."}) as broker:
 | Instrument fetch + resolve | Yes | Yes |
 | Streaming (WebSocket) | Yes | Yes |
 | GTT orders | Yes | Yes |
-| Margin calculator API | Planned | Planned |
+| Margin calculator API | Not supported | Not supported |
 
 ## Documentation
 

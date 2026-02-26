@@ -46,7 +46,7 @@ await broker.init()
 await broker.close()
 ```
 
-Session is managed automatically. No `login()` call. No token refresh logic.
+Session is managed automatically. No `login()` call in user code.
 Swap `"zerodha"` for `"angelone"` — nothing else changes.
 
 ---
@@ -61,11 +61,11 @@ from tt_connect.enums import Exchange, OptionType
 reliance = Equity(exchange=Exchange.NSE, symbol="RELIANCE")
 
 # Future
-nifty_fut = Future(exchange=Exchange.NFO, symbol="NIFTY", expiry="2025-01-30")
+nifty_fut = Future(exchange=Exchange.NSE, symbol="NIFTY", expiry="2025-01-30")
 
 # Option
 nifty_ce = Option(
-    exchange=Exchange.NFO,
+    exchange=Exchange.NSE,
     symbol="NIFTY",
     expiry="2025-01-30",
     strike=23000,

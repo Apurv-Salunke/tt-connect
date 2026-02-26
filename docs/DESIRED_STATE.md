@@ -16,7 +16,7 @@ Broker is a configuration detail, not an architectural one.
 - Swapping broker does not change any auth-handling code
 
 ```python
-async with TTConnect("zerodha", config) as broker:
+async with AsyncTTConnect("zerodha", config) as broker:
     # That's it. Session is managed, refreshed, and persisted automatically.
     pass
 ```
@@ -34,8 +34,8 @@ from tt_connect.instruments import Equity, Future, Option
 from tt_connect.enums import Exchange, OptionType, ProductType, OrderType, Side
 
 equity = Equity(exchange=Exchange.NSE, symbol="RELIANCE")
-future = Future(exchange=Exchange.NFO, symbol="NIFTY", expiry="2025-01-30")
-option = Option(exchange=Exchange.NFO, symbol="NIFTY", expiry="2025-01-30", strike=18000, option_type=OptionType.CE)
+future = Future(exchange=Exchange.NSE, symbol="NIFTY", expiry="2025-01-30")
+option = Option(exchange=Exchange.NSE, symbol="NIFTY", expiry="2025-01-30", strike=18000, option_type=OptionType.CE)
 ```
 
 Enums cover all categorical inputs: `Exchange`, `OptionType`, `ProductType`, `OrderType`, `Side`
