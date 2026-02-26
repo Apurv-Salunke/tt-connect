@@ -8,7 +8,7 @@
 - [x] Trust/compliance files: LICENSE, SECURITY.md, CODEOWNERS.
 - [x] Compatibility matrix: CI test job runs on matrix [3.11, 3.12].
 - [x] Typed configuration: AngelOneConfig + ZerodhaConfig Pydantic models, extra="forbid".
-- [x] Operational resilience: PlaceOrderRequest idempotency_key (UUID4 auto-generated).
+- [x] Operational resilience: PlaceOrderRequest `tag` is UUID4 auto-generated and reused as broker idempotency tag/uniqueorderid.
 - [x] DB lifecycle: SCHEMA_VERSION versioning, CHECK constraints, exchange enum validation.
 - [x] Historical OHLC data (both brokers). Zerodha oi=1 sent by default.
 - [x] Zerodha market quotes REST: get_quotes → list[Tick], bid/ask from depth.
@@ -23,6 +23,7 @@
 - [ ] Structured logging: log every outbound request and response envelope
       (broker, method, endpoint, latency ms, status). Use Python stdlib logging
       so callers can configure handlers. Include a correlation ID per request.
+      Plan documented in docs/STRUCTURED_LOGGING_PLAN.md.
 
 - [ ] AngelOne position ltp/pnl: verify live whether the API returns ltp,
       urealised, realised. If absent, mark them Optional in Position or remove.
