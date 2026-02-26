@@ -146,6 +146,7 @@ class AngelOneTransformer:
         }
         if req.trigger_price:
             params["triggerprice"] = str(req.trigger_price)
+        params["uniqueorderid"] = req.tag
         return params
 
     @staticmethod

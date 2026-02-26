@@ -61,6 +61,8 @@ class ZerodhaTransformer:
             params["price"] = req.price
         if req.trigger_price:
             params["trigger_price"] = req.trigger_price
+        # Zerodha `tag` is max 20 alphanumeric chars — strip dashes from UUID
+        params["tag"] = req.tag.replace("-", "")[:20]
         return params
 
     @staticmethod

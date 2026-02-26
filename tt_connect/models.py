@@ -1,6 +1,7 @@
 from __future__ import annotations
 from datetime import datetime
-from pydantic import BaseModel, ConfigDict
+from uuid import uuid4
+from pydantic import BaseModel, ConfigDict, Field
 from tt_connect.enums import CandleInterval, Side, ProductType, OrderType, OrderStatus
 from tt_connect.instruments import Instrument
 
@@ -59,6 +60,7 @@ class PlaceOrderRequest(BaseModel):
     product: ProductType
     price: float | None = None
     trigger_price: float | None = None
+    tag: str = Field(default_factory=lambda: str(uuid4()))
 
 
 class ModifyOrderRequest(BaseModel):
