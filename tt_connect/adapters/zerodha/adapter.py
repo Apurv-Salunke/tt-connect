@@ -7,6 +7,7 @@ from tt_connect.adapters.zerodha.transformer import ZerodhaTransformer
 from tt_connect.adapters.zerodha.capabilities import ZERODHA_CAPABILITIES
 from tt_connect.adapters.zerodha.parser import parse, ParsedInstruments
 from tt_connect.capabilities import Capabilities
+from tt_connect.config import validate_config
 from tt_connect.ws.client import BrokerWebSocket
 
 BASE_URL = "https://api.kite.trade"
@@ -17,6 +18,7 @@ class ZerodhaAdapter(BrokerAdapter, broker_id="zerodha"):
 
     def __init__(self, config: JsonDict):
         """Initialize auth and transformer for Zerodha."""
+        validate_config("zerodha", config)
         super().__init__(config)
         self.auth = ZerodhaAuth(config, self._client)
         self._transformer = ZerodhaTransformer()

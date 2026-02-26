@@ -65,6 +65,12 @@ class OrderNotFoundError(OrderError):
     retryable = False
 
 
+class ConfigurationError(TTConnectError):
+    """Invalid or incomplete broker configuration supplied at construction time."""
+
+    retryable = False
+
+
 class ClientNotConnectedError(TTConnectError):
     """Client must be connected before this operation. Call init() first."""
 

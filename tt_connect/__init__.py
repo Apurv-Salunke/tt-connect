@@ -1,7 +1,9 @@
 """Public package entrypoint for tt-connect clients."""
 
 from tt_connect.client import AsyncTTConnect
+from tt_connect.config import AngelOneConfig, ZerodhaConfig
 from tt_connect.enums import CandleInterval
+from tt_connect.exceptions import ConfigurationError
 from tt_connect.models import (
     Candle,
     GetHistoricalRequest,
@@ -21,12 +23,19 @@ import tt_connect.adapters.angelone.adapter  # noqa: F401
 __all__ = [
     "TTConnect",
     "AsyncTTConnect",
+    # Config
+    "AngelOneConfig",
+    "ZerodhaConfig",
+    "ConfigurationError",
+    # Order models
     "PlaceOrderRequest",
     "ModifyOrderRequest",
+    # GTT models
     "PlaceGttRequest",
     "ModifyGttRequest",
     "GttLeg",
     "Gtt",
+    # Historical
     "GetHistoricalRequest",
     "Candle",
     "CandleInterval",

@@ -8,6 +8,7 @@ from tt_connect.adapters.angelone.transformer import AngelOneTransformer
 from tt_connect.adapters.angelone.capabilities import ANGELONE_CAPABILITIES
 from tt_connect.adapters.angelone.parser import parse, ParsedInstruments
 from tt_connect.capabilities import Capabilities
+from tt_connect.config import validate_config
 from tt_connect.exceptions import UnsupportedFeatureError
 from tt_connect.ws.client import BrokerWebSocket
 
@@ -22,6 +23,7 @@ class AngelOneAdapter(BrokerAdapter, broker_id="angelone"):
 
     def __init__(self, config: JsonDict):
         """Initialize auth and transformer for AngelOne."""
+        validate_config("angelone", config)
         super().__init__(config)
         self.auth = AngelOneAuth(config, self._client)
         self._transformer = AngelOneTransformer()
