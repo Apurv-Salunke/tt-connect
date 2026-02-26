@@ -5,13 +5,13 @@ from __future__ import annotations
 from datetime import datetime
 from typing import Any
 
-from tt_connect.enums import Exchange, Side, ProductType, OrderType, OrderStatus
+from tt_connect.enums import CandleInterval, Exchange, Side, ProductType, OrderType, OrderStatus
 from tt_connect.exceptions import (
     TTConnectError, AuthenticationError, OrderError, OrderNotFoundError,
     InvalidOrderError, InstrumentNotFoundError, BrokerError,
 )
 from tt_connect.instruments import Instrument
-from tt_connect.models import Gtt, GttLeg, ModifyGttRequest, ModifyOrderRequest, PlaceGttRequest, PlaceOrderRequest, Profile, Fund, Holding, Position, Order, Trade
+from tt_connect.models import Candle, GetHistoricalRequest, Gtt, GttLeg, ModifyGttRequest, ModifyOrderRequest, PlaceGttRequest, PlaceOrderRequest, Profile, Fund, Holding, Position, Order, Trade
 
 # AngelOne error code → exception class  (source: SmartAPI official error list)
 ERROR_MAP: dict[str, type[TTConnectError]] = {
@@ -250,6 +250,54 @@ class AngelOneTransformer:
                 product=product,
             )],
         )
+
+    _INTERVAL_MAP: dict[CandleInterval, str] = {
+        CandleInterval.MINUTE_1:  "ONE_MINUTE",
+        CandleInterval.MINUTE_3:  "THREE_MINUTE",
+        CandleInterval.MINUTE_5:  "FIVE_MINUTE",
+        CandleInterval.MINUTE_10: "TEN_MINUTE",
+        CandleInterval.MINUTE_15: "FIFTEEN_MINUTE",
+        CandleInterval.MINUTE_30: "THIRTY_MINUTE",
+        CandleInterval.HOUR_1:    "ONE_HOUR",
+        CandleInterval.DAY:       "ONE_DAY",
+    }
+
+    @staticmethod
+    def to_historical_params(
+        token: str,
+        broker_symbol: str,
+        exchange: str,
+        req: GetHistoricalRequest,
+    ) -> dict[str, Any]:
+        """Build AngelOne historical candle POST body."""
+        interval = AngelOneTransformer._INTERVAL_MAP[req.interval]
+        return {
+            "exchange":    exchange,
+            "symboltoken": token,
+            "interval":    interval,
+            "fromdate":    req.from_date.strftime("%Y-%m-%d %H:%M"),
+            "todate":      req.to_date.strftime("%Y-%m-%d %H:%M"),
+        }
+
+    @staticmethod
+    def to_candles(rows: list[Any], instrument: Instrument) -> list[Candle]:
+        """Convert AngelOne candle rows to canonical Candle models.
+
+        Each row: [timestamp_str, open, high, low, close, volume]
+        """
+        result: list[Candle] = []
+        for row in rows:
+            ts = datetime.fromisoformat(str(row[0]))
+            result.append(Candle(
+                instrument=instrument,
+                timestamp=ts,
+                open=float(row[1]),
+                high=float(row[2]),
+                low=float(row[3]),
+                close=float(row[4]),
+                volume=int(row[5]),
+            ))
+        return result
 
     # --- Incoming ---
 

@@ -11,8 +11,9 @@ from tt_connect.capabilities import Capabilities
 from tt_connect.exceptions import UnsupportedFeatureError
 from tt_connect.ws.client import BrokerWebSocket
 
-BASE_URL     = "https://apiconnect.angelbroking.com/rest/secure/angelbroking"
-GTT_BASE_URL = "https://apiconnect.angelone.in/rest/secure/angelbroking/gtt/v1"
+BASE_URL        = "https://apiconnect.angelbroking.com/rest/secure/angelbroking"
+GTT_BASE_URL    = "https://apiconnect.angelone.in/rest/secure/angelbroking/gtt/v1"
+HISTORICAL_URL  = "https://apiconnect.angelone.in/rest/secure/angelbroking/historical/v1/getCandleData"
 INSTRUMENTS_URL = "https://margincalculator.angelbroking.com/OpenAPI_File/files/OpenAPIScripMaster.json"
 
 
@@ -151,6 +152,15 @@ class AngelOneAdapter(BrokerAdapter, broker_id="angelone"):
             raw["data"] = []
         elif isinstance(data, dict):
             raw["data"] = [data]
+        return raw
+
+    # --- Historical ---
+
+    async def get_historical(self, token: str, params: JsonDict) -> JsonDict:
+        """Fetch historical OHLC candles for an instrument token."""
+        raw = await self._request("POST", HISTORICAL_URL,
+                                  headers=self.auth.headers, json=params)
+        raw["data"] = raw.get("data") or []
         return raw
 
     # --- WebSocket ---

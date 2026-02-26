@@ -9,7 +9,7 @@ import httpx
 
 from tt_connect.capabilities import Capabilities
 from tt_connect.exceptions import TTConnectError, UnsupportedFeatureError
-from tt_connect.models import Fund, Gtt, Holding, ModifyGttRequest, ModifyOrderRequest, Order, PlaceGttRequest, PlaceOrderRequest, Position, Profile, Trade
+from tt_connect.models import Candle, Fund, GetHistoricalRequest, Gtt, Holding, ModifyGttRequest, ModifyOrderRequest, Order, PlaceGttRequest, PlaceOrderRequest, Position, Profile, Trade
 from tt_connect.ws.client import BrokerWebSocket
 
 logger = logging.getLogger(__name__)
@@ -68,6 +68,15 @@ class BrokerTransformer(Protocol):
     def to_trade(raw: JsonDict) -> Trade: ...
     @staticmethod
     def to_order(raw: JsonDict, instrument: Any = None) -> Order: ...
+    @staticmethod
+    def to_historical_params(
+        token: str,
+        broker_symbol: str,
+        exchange: str,
+        req: GetHistoricalRequest,
+    ) -> JsonDict: ...
+    @staticmethod
+    def to_candles(rows: list[Any], instrument: Any) -> list[Candle]: ...
 
 
 class BrokerAdapter:
@@ -154,6 +163,14 @@ class BrokerAdapter:
     async def get_gtts(self) -> JsonDict:
         """Fetch all GTT rules. Override in adapters that support GTT."""
         raise UnsupportedFeatureError(f"{self.__class__.__name__} does not support GTT.")
+
+    # --- Historical ---
+
+    async def get_historical(self, token: str, params: JsonDict) -> JsonDict:
+        """Fetch historical OHLC candles. Override in adapters that support historical data."""
+        raise UnsupportedFeatureError(
+            f"{self.__class__.__name__} does not support historical data."
+        )
 
     # --- WebSocket ---
 

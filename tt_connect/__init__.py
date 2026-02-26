@@ -1,7 +1,10 @@
 """Public package entrypoint for tt-connect clients."""
 
 from tt_connect.client import AsyncTTConnect
+from tt_connect.enums import CandleInterval
 from tt_connect.models import (
+    Candle,
+    GetHistoricalRequest,
     Gtt,
     GttLeg,
     ModifyGttRequest,
@@ -24,4 +27,7 @@ __all__ = [
     "ModifyGttRequest",
     "GttLeg",
     "Gtt",
+    "GetHistoricalRequest",
+    "Candle",
+    "CandleInterval",
 ]

@@ -7,7 +7,11 @@ import threading
 from concurrent.futures import Future as ThreadFuture
 from typing import Any, Coroutine, TypeVar
 
-from tt_connect.models import Fund, Gtt, Holding, ModifyGttRequest, ModifyOrderRequest, Order, PlaceGttRequest, PlaceOrderRequest, Position, Profile, Trade
+from datetime import datetime
+
+from tt_connect.enums import CandleInterval
+from tt_connect.instruments import Instrument
+from tt_connect.models import Candle, Fund, Gtt, Holding, ModifyGttRequest, ModifyOrderRequest, Order, PlaceGttRequest, PlaceOrderRequest, Position, Profile, Trade
 
 T = TypeVar("T")
 
@@ -98,3 +102,12 @@ class TTConnect:
 
     def get_gtts(self) -> list[Gtt]:
         return self._run(self._async.get_gtts())
+
+    def get_historical(
+        self,
+        instrument: Instrument,
+        interval: CandleInterval,
+        from_date: datetime,
+        to_date: datetime,
+    ) -> list[Candle]:
+        return self._run(self._async.get_historical(instrument, interval, from_date, to_date))

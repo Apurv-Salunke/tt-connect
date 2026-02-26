@@ -1,10 +1,14 @@
-"""Portfolio mixin: profile, funds, holdings, positions, and trades."""
+"""Portfolio mixin: profile, funds, holdings, positions, trades, and historical OHLC."""
 
 from __future__ import annotations
 
+from datetime import datetime
+
 from tt_connect.adapters.base import JsonDict
+from tt_connect.enums import CandleInterval
+from tt_connect.instruments import Instrument
 from tt_connect.lifecycle import _ClientBase
-from tt_connect.models import Fund, Holding, Position, Profile, Trade
+from tt_connect.models import Candle, Fund, GetHistoricalRequest, Holding, Position, Profile, Trade
 
 
 class PortfolioMixin(_ClientBase):
@@ -39,3 +43,25 @@ class PortfolioMixin(_ClientBase):
         self._require_connected()
         raw: JsonDict = await self._adapter.get_trades()
         return [self._adapter.transformer.to_trade(t) for t in raw["data"]]
+
+    async def get_historical(
+        self,
+        instrument: Instrument,
+        interval: CandleInterval,
+        from_date: datetime,
+        to_date: datetime,
+    ) -> list[Candle]:
+        """Fetch historical OHLC candles for an instrument."""
+        self._require_connected()
+        resolved = await self._resolve(instrument)
+        req = GetHistoricalRequest(
+            instrument=instrument,
+            interval=interval,
+            from_date=from_date,
+            to_date=to_date,
+        )
+        params: JsonDict = self._adapter.transformer.to_historical_params(
+            resolved.token, resolved.broker_symbol, resolved.exchange, req,
+        )
+        raw: JsonDict = await self._adapter.get_historical(resolved.token, params)
+        return self._adapter.transformer.to_candles(raw["data"], instrument)

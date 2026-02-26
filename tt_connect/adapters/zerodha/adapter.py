@@ -125,6 +125,20 @@ class ZerodhaAdapter(BrokerAdapter, broker_id="zerodha"):
         return await self._request("GET", f"{BASE_URL}/gtt/triggers",
                                    headers=self.auth.headers)
 
+    # --- Historical ---
+
+    async def get_historical(self, token: str, params: JsonDict) -> JsonDict:
+        """Fetch historical OHLC candles for an instrument token."""
+        interval = params["interval"]
+        query = {k: v for k, v in params.items() if k != "interval"}
+        raw = await self._request(
+            "GET", f"{BASE_URL}/instruments/historical/{token}/{interval}",
+            headers=self.auth.headers, params=query,
+        )
+        # Normalize: flatten candles out of the nested data dict
+        raw["data"] = raw["data"]["candles"]
+        return raw
+
     # --- WebSocket ---
 
     def create_ws_client(self) -> BrokerWebSocket:

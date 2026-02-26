@@ -1,7 +1,7 @@
 from __future__ import annotations
 from datetime import datetime
 from pydantic import BaseModel, ConfigDict
-from tt_connect.enums import Side, ProductType, OrderType, OrderStatus
+from tt_connect.enums import CandleInterval, Side, ProductType, OrderType, OrderStatus
 from tt_connect.instruments import Instrument
 
 
@@ -180,3 +180,27 @@ class Tick(BaseModel):
     bid: float | None = None
     ask: float | None = None
     timestamp: datetime | None = None
+
+
+class GetHistoricalRequest(BaseModel):
+    """Canonical input model for requesting historical OHLC candles."""
+
+    instrument: Instrument
+    interval: CandleInterval
+    from_date: datetime
+    to_date: datetime
+
+
+class Candle(BaseModel):
+    """Normalized OHLC candle for one interval period."""
+
+    model_config = ConfigDict(frozen=True)
+
+    instrument: Instrument
+    timestamp: datetime
+    open: float
+    high: float
+    low: float
+    close: float
+    volume: int
+    oi: int | None = None

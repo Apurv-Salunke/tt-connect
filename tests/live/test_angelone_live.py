@@ -31,3 +31,24 @@ async def test_get_positions(angelone_broker):
 async def test_get_orders(angelone_broker):
     orders = await angelone_broker.get_orders()
     assert isinstance(orders, list)
+
+
+@pytest.mark.live
+async def test_get_historical_returns_candles(angelone_broker):
+    from datetime import datetime
+    from tt_connect.enums import CandleInterval
+    from tt_connect.instruments import Equity
+
+    instr = Equity(exchange="NSE", symbol="SBIN")
+    candles = await angelone_broker.get_historical(
+        instr,
+        CandleInterval.DAY,
+        from_date=datetime(2025, 1, 1),
+        to_date=datetime(2025, 1, 31),
+    )
+    assert isinstance(candles, list)
+    assert len(candles) > 0
+    c = candles[0]
+    assert c.open > 0
+    assert c.high >= c.low
+    assert c.volume >= 0
