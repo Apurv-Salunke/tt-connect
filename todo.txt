@@ -1,12 +1,52 @@
 # tt-connect Production Hardening TODO (Source of Truth)
+# Current state: 245 tests, lint + mypy clean, 69% coverage — 2026-02-26
 
-- [x] Release governance: add semver/release policy, changelog workflow, and tag-based publish pipeline.
-- [ ] Trust/compliance files: add `LICENSE`, `SECURITY.md`, and `CODEOWNERS`.
-- [ ] Security hardening in CI: add dependency vulnerability scans, secret scanning, and SAST.
-- [ ] Broker live-test coverage: add AngelOne live tests alongside Zerodha.
-- [ ] Feature parity: implement and validate `calculate_margin(...)`.
-- [ ] Typed configuration: replace raw config dict usage with validated schema models.
-- [ ] Operational resilience: improve retry policy with jittered backoff and idempotency handling for order operations.
-- [ ] Observability: add structured logs, correlation IDs, and metrics hooks.
-- [ ] DB lifecycle: introduce schema versioning and migration strategy for SQLite.
-- [ ] Compatibility matrix: run CI on multiple Python versions (at least 3.11 and 3.12).
+- [x] Release governance: semver/release policy, changelog workflow, tag-based publish pipeline.
+- [x] Trust/compliance files: LICENSE, SECURITY.md, CODEOWNERS.
+- [x] Broker live-test coverage: AngelOne live tests added (profile, funds, holdings, positions,
+      orders, historical OHLC for equities and NFO options). pytest `live` mark registered.
+- [x] Typed configuration: AngelOneConfig + ZerodhaConfig Pydantic models, extra="forbid"
+      catches typos, ConfigurationError raised at construction time. Both dict and model
+      inputs accepted. Exported from tt_connect public API.
+- [x] Operational resilience: PlaceOrderRequest.idempotency_key auto-generates UUID4 on
+      construction. Zerodha: sent as `tag` (20-char alphanumeric). AngelOne: sent as
+      `uniqueorderid`. Same key on every retry attempt — duplicate orders prevented.
+- [x] Compatibility matrix: CI test job now runs on matrix [3.11, 3.12].
+- [ ] Security hardening in CI: dependency vulnerability scans, secret scanning, SAST.
+- [ ] Observability: structured logs with correlation IDs and metrics hooks.
+- [x] DB lifecycle: SCHEMA_VERSION constant in db.py. init_schema() detects version
+      mismatch → drops all tables → recreates clean → repopulates via normal staleness
+      refresh. CHECK (option_type IN ('CE','PE')) enforced at DB level. No migration
+      framework — drop+recreate is correct for a pure cache.
+
+
+# ── Feature Backlog ──────────────────────────────────────────────────────────
+
+## High Value
+
+- [x] Historical OHLC data (both brokers)
+      get_historical(instrument, interval, from_date, to_date) -> list[Candle]
+      Verified live: equities (SBIN) and NFO options (NIFTY CE).
+
+- [ ] AngelOne Order Status WebSocket
+      Separate WS stream for order/trade update events.
+      WS infrastructure exists but order updates not wired.
+      Needs on_order_update callback on the client.
+
+
+## Smaller REST Endpoints
+
+- [ ] Position Conversion (both brokers) — switch MIS <-> CNC mid-day
+- [ ] Margin Calculator (both brokers) — pre-trade margin estimate
+- [ ] Zerodha order varieties — AMO, Cover Orders, Iceberg, Auction
+      Needs optional variety field on PlaceOrderRequest
+- [ ] Zerodha market quotes REST (LTP snapshot without WebSocket)
+
+
+## Low Priority
+
+- [ ] Alerts (Zerodha)
+- [ ] Mutual Funds (Zerodha)
+- [ ] EDIS (AngelOne)
+- [ ] Brokerage Calculator (AngelOne)
+- [ ] Postbacks / Webhooks (both brokers)
