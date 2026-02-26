@@ -152,7 +152,11 @@ class AngelOneTransformer:
     @staticmethod
     def to_modify_params(req: ModifyOrderRequest) -> dict[str, Any]:
         """Build AngelOne order modification payload from a ModifyOrderRequest."""
-        params: dict[str, Any] = {"orderid": req.order_id}
+        params: dict[str, Any] = {
+            "variety":  "NORMAL",
+            "orderid":  req.order_id,
+            "duration": "DAY",
+        }
         if req.qty is not None:
             params["quantity"] = str(req.qty)
         if req.price is not None:
@@ -351,10 +355,12 @@ class AngelOneTransformer:
         """Normalize positions row."""
         net_qty = _i(raw.get("netqty"))
         # avg price: buy side for long, sell side for short
+        # Use _f() before `or` — raw values are strings, so "0" is truthy and
+        # would prevent fallback to the carry-forward price if done naively.
         if net_qty >= 0:
-            avg = _f(raw.get("totalbuyavgprice") or raw.get("cfbuyavgprice"))
+            avg = _f(raw.get("totalbuyavgprice")) or _f(raw.get("cfbuyavgprice"))
         else:
-            avg = _f(raw.get("totalsellav gprice") or raw.get("cfsellavgprice"))
+            avg = _f(raw.get("totalsellavgprice")) or _f(raw.get("cfsellavgprice"))
         ltp = _f(raw.get("ltp"))
         pnl = _f(raw.get("urealised")) + _f(raw.get("realised"))
         symbol: str = (raw.get("tradingsymbol") or "").removesuffix("-EQ")
