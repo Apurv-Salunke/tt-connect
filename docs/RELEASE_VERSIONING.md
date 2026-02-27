@@ -62,6 +62,8 @@ Use PyPI Trusted Publisher (OIDC) for GitHub Actions.
 
 - Avoid long-lived PyPI tokens in repository secrets.
 - Restrict release workflow permissions to minimum required scope.
+- If `dev` is PR-locked by rulesets, store a fine-grained PAT (contents:write)
+  as `RELEASE_BYPASS_TOKEN` for version-bump automation.
 
 ## Required CI Workflows
 
@@ -71,6 +73,7 @@ Use PyPI Trusted Publisher (OIDC) for GitHub Actions.
    - runs on merge to `dev`
    - validates semver label
    - bumps version + changelog and pushes bot commit
+   - uses `RELEASE_BYPASS_TOKEN` when direct bot push is blocked by rulesets
 3. `publish-main.yml`
    - runs on `push` tag `v*.*.*` only
    - verifies branch/tag/version alignment
