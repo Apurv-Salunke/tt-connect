@@ -72,7 +72,7 @@ Use PyPI Trusted Publisher (OIDC) for GitHub Actions.
    - validates semver label
    - bumps version + changelog and pushes bot commit
 3. `publish-main.yml`
-   - runs on `push` tag `v*`
+   - runs on `push` tag `v*.*.*` only
    - verifies branch/tag/version alignment
    - publishes to PyPI and creates release
 
