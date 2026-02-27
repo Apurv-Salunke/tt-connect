@@ -145,3 +145,36 @@ async def test_get_expiries_unknown_underlying_returns_empty(populated_db):
     mgr = _manager(populated_db)
     unknown = Equity(exchange="NSE", symbol="DOESNOTEXIST")
     assert await mgr.get_expiries(unknown) == []
+
+
+# ---------------------------------------------------------------------------
+# search_instruments
+# ---------------------------------------------------------------------------
+
+async def test_search_instruments_returns_matches(populated_db):
+    mgr = _manager(populated_db)
+    results = await mgr.search_instruments("REL")
+    symbols = [r.symbol for r in results]
+    assert "RELIANCE" in symbols
+    assert all(isinstance(r, Equity) for r in results)
+
+
+async def test_search_instruments_case_insensitive(populated_db):
+    mgr = _manager(populated_db)
+    upper = await mgr.search_instruments("REL")
+    lower = await mgr.search_instruments("rel")
+    assert upper == lower
+
+
+async def test_search_instruments_exchange_filter(populated_db):
+    mgr = _manager(populated_db)
+    results = await mgr.search_instruments("RELIANCE", exchange="NSE")
+    assert all(str(r.exchange) == "NSE" for r in results)
+    assert len(results) >= 1
+
+
+async def test_search_instruments_no_match_returns_empty(populated_db):
+    mgr = _manager(populated_db)
+    results = await mgr.search_instruments("DOESNOTEXISTXYZ")
+    assert results == []
+

@@ -8,7 +8,7 @@ import aiosqlite
 from tt_connect.enums import Exchange, OnStale, OptionType
 from tt_connect.exceptions import TTConnectError, InstrumentManagerError
 from tt_connect.instrument_manager.db import get_connection, init_schema, truncate_all
-from tt_connect.instruments import Future, Instrument, Option
+from tt_connect.instruments import Equity, Future, Instrument, Option
 
 logger = logging.getLogger(__name__)
 
@@ -369,6 +369,41 @@ class InstrumentManager:
         ) as cur:
             rows = await cur.fetchall()
         return [date.fromisoformat(row[0]) for row in rows]
+
+    async def search_instruments(
+        self,
+        query: str,
+        exchange: str | None = None,
+    ) -> list[Equity]:
+        """Search underlyings (equities + indices) by symbol substring.
+
+        Matching is case-insensitive. Results are sorted by exchange then symbol
+        and capped at 50 entries.
+        """
+        pattern = f"%{query.upper()}%"
+        if exchange is not None:
+            sql = """
+                SELECT i.exchange, i.symbol
+                FROM instruments i
+                JOIN equities e ON e.instrument_id = i.id
+                WHERE UPPER(i.symbol) LIKE ? AND i.exchange = ?
+                ORDER BY i.exchange, i.symbol
+                LIMIT 50
+            """
+            params: tuple[Any, ...] = (pattern, exchange)
+        else:
+            sql = """
+                SELECT i.exchange, i.symbol
+                FROM instruments i
+                JOIN equities e ON e.instrument_id = i.id
+                WHERE UPPER(i.symbol) LIKE ?
+                ORDER BY i.exchange, i.symbol
+                LIMIT 50
+            """
+            params = (pattern,)
+        async with self._conn_or_raise().execute(sql, params) as cur:
+            rows = await cur.fetchall()
+        return [Equity(exchange=Exchange(row[0]), symbol=row[1]) for row in rows]
 
     @property
     def connection(self) -> aiosqlite.Connection:

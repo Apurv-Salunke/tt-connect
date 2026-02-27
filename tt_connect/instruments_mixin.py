@@ -4,7 +4,7 @@ from __future__ import annotations
 
 from datetime import date
 
-from tt_connect.instruments import Future, Instrument, Option
+from tt_connect.instruments import Equity, Future, Instrument, Option
 from tt_connect.lifecycle import _ClientBase
 
 
@@ -56,3 +56,25 @@ class InstrumentsMixin(_ClientBase):
         """
         self._require_connected()
         return await self._instrument_manager.get_expiries(instrument)
+
+    async def search_instruments(
+        self,
+        query: str,
+        exchange: str | None = None,
+    ) -> list[Equity]:
+        """Search the instrument master by symbol substring (case-insensitive).
+
+        Returns up to 50 matching underlyings sorted by exchange then symbol.
+
+        Example::
+
+            results = await client.search_instruments("RELIANCE")
+            # → [Equity(exchange=BSE, symbol='RELIANCE'),
+            #    Equity(exchange=NSE, symbol='RELIANCE')]
+
+            results = await client.search_instruments("REL", exchange="NSE")
+            # → [Equity(exchange=NSE, symbol='RELIANCE')]
+        """
+        self._require_connected()
+        return await self._instrument_manager.search_instruments(query, exchange)
+

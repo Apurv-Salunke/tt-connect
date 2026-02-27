@@ -110,3 +110,30 @@ async def test_get_expiries_empty_when_no_derivatives():
     result = await client.get_expiries(Equity(exchange="NSE", symbol="SMALLCAP"))
 
     assert result == []
+
+
+# ---------------------------------------------------------------------------
+# search_instruments
+# ---------------------------------------------------------------------------
+
+async def test_search_instruments_delegates_to_manager():
+    client = _make_client()
+    expected = [Equity(exchange="NSE", symbol="SBIN")]
+    client._instrument_manager.search_instruments = AsyncMock(return_value=expected)
+
+    result = await client.search_instruments("SBI")
+
+    assert result == expected
+    client._instrument_manager.search_instruments.assert_awaited_once_with("SBI", None)
+
+
+async def test_search_instruments_with_exchange_filter():
+    client = _make_client()
+    expected = [Equity(exchange="NSE", symbol="RELIANCE")]
+    client._instrument_manager.search_instruments = AsyncMock(return_value=expected)
+
+    result = await client.search_instruments("REL", exchange="NSE")
+
+    assert result == expected
+    client._instrument_manager.search_instruments.assert_awaited_once_with("REL", "NSE")
+

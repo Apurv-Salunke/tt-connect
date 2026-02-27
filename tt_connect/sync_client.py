@@ -10,7 +10,7 @@ from typing import Any, Coroutine, TypeVar
 from datetime import date, datetime
 
 from tt_connect.enums import CandleInterval
-from tt_connect.instruments import Future, Instrument, Option
+from tt_connect.instruments import Equity, Future, Instrument, Option
 from tt_connect.models import Candle, Fund, Gtt, Holding, ModifyGttRequest, ModifyOrderRequest, Order, PlaceGttRequest, PlaceOrderRequest, Position, Profile, Tick, Trade
 
 T = TypeVar("T")
@@ -133,3 +133,11 @@ class TTConnect:
 
     def get_expiries(self, instrument: Instrument) -> list[date]:
         return self._run(self._async.get_expiries(instrument))
+
+    def search_instruments(
+        self,
+        query: str,
+        exchange: str | None = None,
+    ) -> list[Equity]:
+        return self._run(self._async.search_instruments(query, exchange))
+
