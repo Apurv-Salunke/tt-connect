@@ -1,5 +1,11 @@
 # Changelog
 
+## 0.2.0 - 2026-02-28
+
+- Bump: **minor**
+- Source PR: #17 feat: add instrument helper APIs (futures/options/expiries/search)
+
+
 ## 0.1.1 - 2026-02-28
 
 - Bump: **patch**
