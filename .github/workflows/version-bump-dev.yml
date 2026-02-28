@@ -128,6 +128,7 @@ jobs:
       - name: Commit and push bump
         env:
           BUMP: ${{ steps.semver.outputs.bump }}
+          RELEASE_BYPASS_TOKEN: ${{ secrets.RELEASE_BYPASS_TOKEN }}
         run: |
           if git diff --quiet; then
             echo "No version changes detected; exiting."
@@ -146,5 +147,8 @@ jobs:
           PY
           )
           git commit -m "chore(release): bump version to ${NEW_VERSION} [skip ci]"
+          if [ -n "${RELEASE_BYPASS_TOKEN}" ]; then
+            git remote set-url origin "https://x-access-token:${RELEASE_BYPASS_TOKEN}@github.com/${GITHUB_REPOSITORY}.git"
+          fi
           git pull --rebase origin dev
           git push origin HEAD:dev
