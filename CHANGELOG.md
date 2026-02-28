@@ -13,6 +13,7 @@ The format is based on Keep a Changelog and this project follows Semantic Versio
 ## [Unreleased]
 
 ### Added
+- Instrument helper APIs for discovery and contract lookup: `search_instruments`, `get_futures`, `get_options`, and `get_expiries`.
 - Zerodha WebSocket streaming via KiteTicker binary protocol — `subscribe()` now works on both Zerodha and AngelOne.
 - GTT (Good Till Triggered) orders for both brokers: `place_gtt`, `modify_gtt`, `cancel_gtt`, `get_gtt`, `get_gtts`. Zerodha supports two-leg OCO; AngelOne supports single-leg.
 - New canonical models: `PlaceGttRequest`, `ModifyGttRequest`, `GttLeg`, `Gtt`.
@@ -29,4 +30,3 @@ The format is based on Keep a Changelog and this project follows Semantic Versio
 - Zerodha and AngelOne adapter foundations.
 - Canonical models/enums, instrument manager, and resolver.
 - Unit and integration test suites with CI lint/type/test gates.
-
