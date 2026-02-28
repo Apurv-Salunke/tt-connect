@@ -39,7 +39,37 @@ jobs:
               commit_sha: sha,
             });
 
-            const pr = prs.data.find(p => p.base?.ref === 'dev' && p.merged_at);
+            let pr = prs.data.find(p => p.base?.ref === 'dev' && p.merged_at);
+
+            // Fallback for cases where commit-to-PR association is temporarily missing.
+            if (!pr) {
+              const commit = await github.rest.repos.getCommit({
+                owner,
+                repo,
+                ref: sha,
+              });
+              const message = commit.data.commit?.message || "";
+
+              // Merge commit: "Merge pull request #123 ..."
+              // Squash merge title: "... (#123)"
+              const m =
+                message.match(/Merge pull request #(\\d+)/i) ||
+                message.match(/\\(#(\\d+)\\)\\s*$/m);
+
+              if (m) {
+                const prNum = Number(m[1]);
+                const resp = await github.rest.pulls.get({
+                  owner,
+                  repo,
+                  pull_number: prNum,
+                });
+                const candidate = resp.data;
+                if (candidate.base?.ref === 'dev' && candidate.merged_at) {
+                  pr = candidate;
+                }
+              }
+            }
+
             if (!pr) {
               core.setFailed(`No merged PR associated with commit ${sha} into dev.`);
               return;
