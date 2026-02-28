@@ -65,8 +65,8 @@ async def test_get_futures_returns_future_objects(populated_db):
 
 async def test_get_options_no_filter_returns_all(populated_db):
     mgr = _manager(populated_db)
-    sbin = Equity(exchange="NSE", symbol="RELIANCE")
-    options = await mgr.get_options(sbin)
+    reliance = Equity(exchange="NSE", symbol="RELIANCE")
+    options = await mgr.get_options(reliance)
 
     assert len(options) > 0
     assert all(o.symbol == "RELIANCE" for o in options)
@@ -74,13 +74,13 @@ async def test_get_options_no_filter_returns_all(populated_db):
 
 async def test_get_options_expiry_filter(populated_db):
     mgr = _manager(populated_db)
-    sbin = Equity(exchange="NSE", symbol="RELIANCE")
+    reliance = Equity(exchange="NSE", symbol="RELIANCE")
 
-    all_opts = await mgr.get_options(sbin)
+    all_opts = await mgr.get_options(reliance)
     assert all_opts, "need at least one option in fixture"
 
     chosen_expiry = all_opts[0].expiry
-    filtered = await mgr.get_options(sbin, expiry=chosen_expiry)
+    filtered = await mgr.get_options(reliance, expiry=chosen_expiry)
 
     assert all(o.expiry == chosen_expiry for o in filtered)
     assert len(filtered) <= len(all_opts)
@@ -88,17 +88,17 @@ async def test_get_options_expiry_filter(populated_db):
 
 async def test_get_options_expiry_filter_no_match(populated_db):
     mgr = _manager(populated_db)
-    sbin = Equity(exchange="NSE", symbol="RELIANCE")
+    reliance = Equity(exchange="NSE", symbol="RELIANCE")
     far_future = date(2099, 1, 1)
-    options = await mgr.get_options(sbin, expiry=far_future)
+    options = await mgr.get_options(reliance, expiry=far_future)
     assert options == []
 
 
 async def test_get_options_sorted(populated_db):
     from tt_connect.instruments import Option
     mgr = _manager(populated_db)
-    sbin = Equity(exchange="NSE", symbol="RELIANCE")
-    options = await mgr.get_options(sbin)
+    reliance = Equity(exchange="NSE", symbol="RELIANCE")
+    options = await mgr.get_options(reliance)
     assert all(isinstance(o, Option) for o in options)
     # Verify sort order: expiry asc, then strike asc
     for a, b in zip(options, options[1:]):
@@ -117,11 +117,11 @@ async def test_get_options_unknown_underlying_returns_empty(populated_db):
 
 async def test_get_expiries_covers_futures_and_options(populated_db):
     mgr = _manager(populated_db)
-    sbin = Equity(exchange="NSE", symbol="RELIANCE")
+    reliance = Equity(exchange="NSE", symbol="RELIANCE")
 
-    expiries = await mgr.get_expiries(sbin)
-    futures_expiries = {f.expiry for f in await mgr.get_futures(sbin)}
-    options_expiries = {o.expiry for o in await mgr.get_options(sbin)}
+    expiries = await mgr.get_expiries(reliance)
+    futures_expiries = {f.expiry for f in await mgr.get_futures(reliance)}
+    options_expiries = {o.expiry for o in await mgr.get_options(reliance)}
 
     assert set(expiries) >= futures_expiries
     assert set(expiries) >= options_expiries
@@ -129,15 +129,15 @@ async def test_get_expiries_covers_futures_and_options(populated_db):
 
 async def test_get_expiries_sorted_ascending(populated_db):
     mgr = _manager(populated_db)
-    sbin = Equity(exchange="NSE", symbol="RELIANCE")
-    expiries = await mgr.get_expiries(sbin)
+    reliance = Equity(exchange="NSE", symbol="RELIANCE")
+    expiries = await mgr.get_expiries(reliance)
     assert expiries == sorted(expiries)
 
 
 async def test_get_expiries_no_duplicates(populated_db):
     mgr = _manager(populated_db)
-    sbin = Equity(exchange="NSE", symbol="RELIANCE")
-    expiries = await mgr.get_expiries(sbin)
+    reliance = Equity(exchange="NSE", symbol="RELIANCE")
+    expiries = await mgr.get_expiries(reliance)
     assert len(expiries) == len(set(expiries))
 
 
@@ -177,4 +177,3 @@ async def test_search_instruments_no_match_returns_empty(populated_db):
     mgr = _manager(populated_db)
     results = await mgr.search_instruments("DOESNOTEXISTXYZ")
     assert results == []
-
