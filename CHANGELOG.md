@@ -1,5 +1,11 @@
 # Changelog
 
+## 0.2.1 - 2026-02-28
+
+- Bump: **patch**
+- Source PR: #19 ci(release): harden dev merge PR detection for auto-bump
+
+
 ## 0.2.0 - 2026-02-28
 
 - Bump: **minor**
