@@ -1,5 +1,11 @@
 # Changelog
 
+## 0.4.0 - 2026-03-04
+
+- Bump: **minor**
+- Source PR: #29 Feat/restructure core brokers
+
+
 ## 0.4.0 - 2026-03-05
 
 - Bump: **minor**
