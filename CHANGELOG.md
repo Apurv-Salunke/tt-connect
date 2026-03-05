@@ -1,5 +1,11 @@
 # Changelog
 
+## 0.4.2 - 2026-03-05
+
+- Bump: **patch**
+- Source PR: #32 Chore/release pr template dev main
+
+
 ## 0.4.1 - 2026-03-05
 
 - Bump: **patch**
