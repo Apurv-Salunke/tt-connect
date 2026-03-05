@@ -1,5 +1,11 @@
 # Changelog
 
+## 0.4.8 - 2026-03-05
+
+- Bump: **patch**
+- Source PR: #40 ci(docs): fix mkdocs extensions in CI and Pages
+
+
 ## 0.4.7 - 2026-03-05
 
 - Bump: **patch**
