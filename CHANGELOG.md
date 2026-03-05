@@ -44,6 +44,9 @@
   - `setup_logging(level="INFO", fmt="json"|"text")` exported from the top-level package.
   - Library remains silent by default (`NullHandler`) — existing users see no change.
 - Usage demonstrated in `examples/zerodha.py` and `examples/angelone.py`.
+- PR workflow templates for releases:
+  - Added `.github/PULL_REQUEST_TEMPLATE/release-dev-to-main.md` for `dev -> main` release PRs.
+  - Updated `.github/pull_request_template.md` to point release PRs to the dedicated release template.
 
 ## 0.2.4 - 2026-02-28
 
