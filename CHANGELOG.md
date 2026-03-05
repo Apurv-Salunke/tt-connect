@@ -1,5 +1,35 @@
 # Changelog
 
+## 0.4.5 - 2026-03-05
+
+- Bump: **patch**
+- Source PR: #35 Chore/readme badges
+
+
+## 0.4.4 - 2026-03-05
+
+- Bump: **patch**
+- Source PR: #34 Chore/add docstrings
+
+
+## 0.4.3 - 2026-03-05
+
+- Bump: **patch**
+- Source PR: #33 Chore/add docstrings
+
+
+## 0.4.2 - 2026-03-05
+
+- Bump: **patch**
+- Source PR: #32 Chore/release pr template dev main
+
+
+## 0.4.1 - 2026-03-05
+
+- Bump: **patch**
+- Source PR: #31 Feat/upgrade logging observability
+
+
 ## 0.4.0 - 2026-03-04
 
 - Bump: **minor**
@@ -44,6 +74,17 @@
   - `setup_logging(level="INFO", fmt="json"|"text")` exported from the top-level package.
   - Library remains silent by default (`NullHandler`) — existing users see no change.
 - Usage demonstrated in `examples/zerodha.py` and `examples/angelone.py`.
+- PR workflow templates for releases:
+  - Added `.github/PULL_REQUEST_TEMPLATE/release-dev-to-main.md` for `dev -> main` release PRs.
+  - Updated `.github/pull_request_template.md` to point release PRs to the dedicated release template.
+- Upgrade-aware package-level observability events:
+  - One-time startup event: `package.startup` with `tt_connect_version`, broker, auth mode, stale policy, and session cache mode.
+  - One-time migration hints: `upgrade.notice` for deprecated config key names (e.g. `authMode` -> `auth_mode`, `apiKey` -> `api_key`).
+  - Automatic emission during client initialization (no application code changes required).
+- Documentation additions:
+  - Added `docs/CORE_BROKER_INTEGRATION.md` to explain `core/` ↔ `brokers/` integration, registries, lifecycle, order flow, and streaming flow.
+  - Added `docs/REMAINING_WORK.md` to track open issues, docs gaps, design limitations, and roadmap priorities.
+  - Updated `README.md` with badges for CI status, PyPI version, supported Python versions, and license.
 
 ## 0.2.4 - 2026-02-28
 
