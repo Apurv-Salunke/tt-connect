@@ -1,5 +1,11 @@
 # Changelog
 
+## 0.4.6 - 2026-03-05
+
+- Bump: **patch**
+- Source PR: #37 ci(release): fix pypi deployment status tracking
+
+
 ## 0.4.5 - 2026-03-05
 
 - Bump: **patch**
