@@ -2,14 +2,15 @@
 
 from __future__ import annotations
 
+import json
 import struct
 from datetime import timezone
 from unittest.mock import MagicMock, patch
 
 import pytest
 
-from tt_connect.instruments import Equity
-from tt_connect.ws.angelone import AngelOneWebSocket
+from tt_connect.core.models.instruments import Equity
+from tt_connect.brokers.angelone.ws import AngelOneWebSocket
 
 
 # ---------------------------------------------------------------------------
@@ -304,7 +305,7 @@ def test_build_token_list_unknown_token_defaults_exchange_1() -> None:
 
 
 async def test_subscribe_populates_token_map() -> None:
-    from tt_connect.instrument_manager.resolver import ResolvedInstrument
+    from tt_connect.core.store.resolver import ResolvedInstrument
 
     auth = MagicMock()
     ws = AngelOneWebSocket(auth=auth)
@@ -314,7 +315,7 @@ async def test_subscribe_populates_token_map() -> None:
     async def on_tick(tick):
         pass
 
-    with patch("tt_connect.ws.angelone.asyncio.create_task"):
+    with patch("tt_connect.brokers.angelone.ws.asyncio.create_task"):
         await ws.subscribe([(instr, resolved)], on_tick=on_tick)
 
     assert ws._token_map["1594"] is instr
@@ -428,9 +429,27 @@ async def test_on_tick_exception_is_logged_and_stream_continues(
     ws._on_tick = on_tick
     ws._parse_binary = lambda _m: object()  # type: ignore[method-assign]
 
-    with patch("tt_connect.ws.angelone.websockets.connect", return_value=_FakeWs([b"a", b"b"])):
-        with caplog.at_level(logging.ERROR, logger="tt_connect.ws.angelone"):
+    with patch("tt_connect.brokers.angelone.ws.websockets.connect", return_value=_FakeWs([b"a", b"b"])):
+        with caplog.at_level(logging.ERROR, logger="tt_connect.brokers.angelone.ws"):
             await ws._connect_and_run()
 
     assert calls == 2
     assert "AngelOne WS on_tick callback failed" in caplog.text
+
+
+async def test_subscribe_requests_snap_quote_mode() -> None:
+    """_send_subscribe defaults to SNAP_QUOTE mode (mode=3)."""
+    sent: list[str] = []
+
+    class _CapturingWs:
+        async def send(self, data: str) -> None:
+            sent.append(data)
+
+    auth = MagicMock()
+    ws = AngelOneWebSocket(auth=auth)
+    ws._token_exchange_type[TOKEN_STR] = 1
+
+    await ws._send_subscribe(_CapturingWs(), [TOKEN_STR])
+
+    msg = json.loads(sent[0])
+    assert msg["params"]["mode"] == 3

@@ -2,12 +2,13 @@
 
 from __future__ import annotations
 
+import json
 import struct
 from datetime import timezone
 import pytest
 
-from tt_connect.instruments import Equity
-from tt_connect.ws.zerodha import ZerodhaWebSocket
+from tt_connect.core.models.instruments import Equity
+from tt_connect.brokers.zerodha.ws import ZerodhaWebSocket
 
 
 # ---------------------------------------------------------------------------
@@ -198,7 +199,7 @@ def test_empty_message_returns_empty() -> None:
 def test_text_error_message_logged(caplog: pytest.LogCaptureFixture) -> None:
     import logging
     ws = ZerodhaWebSocket(api_key="key", access_token="tok")
-    with caplog.at_level(logging.ERROR, logger="tt_connect.ws.zerodha"):
+    with caplog.at_level(logging.ERROR, logger="tt_connect.brokers.zerodha.ws"):
         ws._handle_text('{"type": "error", "data": "Rate limit exceeded"}')
     assert "Rate limit exceeded" in caplog.text
 
@@ -206,7 +207,7 @@ def test_text_error_message_logged(caplog: pytest.LogCaptureFixture) -> None:
 def test_text_broker_message_logged(caplog: pytest.LogCaptureFixture) -> None:
     import logging
     ws = ZerodhaWebSocket(api_key="key", access_token="tok")
-    with caplog.at_level(logging.INFO, logger="tt_connect.ws.zerodha"):
+    with caplog.at_level(logging.INFO, logger="tt_connect.brokers.zerodha.ws"):
         ws._handle_text('{"type": "message", "data": "Market closed"}')
     assert "Market closed" in caplog.text
 
@@ -275,9 +276,26 @@ async def test_on_tick_exception_is_logged_and_stream_continues(
     ws._on_tick = on_tick
     ws._parse_binary_message = lambda _m: [object(), object()]  # type: ignore[method-assign]
 
-    with patch("tt_connect.ws.zerodha.websockets.connect", return_value=_FakeWs([b"ab"])):
-        with caplog.at_level(logging.ERROR, logger="tt_connect.ws.zerodha"):
+    with patch("tt_connect.brokers.zerodha.ws.websockets.connect", return_value=_FakeWs([b"ab"])):
+        with caplog.at_level(logging.ERROR, logger="tt_connect.brokers.zerodha.ws"):
             await ws._connect_and_run()
 
     assert calls == 2
     assert "Zerodha WS on_tick callback failed" in caplog.text
+
+
+async def test_subscribe_requests_full_mode() -> None:
+    """_send_subscribe sends mode=full, not mode=quote."""
+    sent: list[str] = []
+
+    class _CapturingWs:
+        async def send(self, data: str) -> None:
+            sent.append(data)
+
+    ws = ZerodhaWebSocket(api_key="key", access_token="tok")
+    await ws._send_subscribe(_CapturingWs(), [408065])
+
+    # Second message sets the subscription mode
+    mode_msg = json.loads(sent[1])
+    assert mode_msg["a"] == "mode"
+    assert mode_msg["v"][0] == "full"
