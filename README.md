@@ -1,11 +1,16 @@
 # tt-connect
 
 [![CI](https://github.com/Tiny-Trader/connect/actions/workflows/connect-ci.yml/badge.svg?branch=main)](https://github.com/Tiny-Trader/connect/actions/workflows/connect-ci.yml)
+[![Docs](https://github.com/Tiny-Trader/connect/actions/workflows/docs-pages.yml/badge.svg?branch=main)](https://github.com/Tiny-Trader/connect/actions/workflows/docs-pages.yml)
 [![PyPI version](https://img.shields.io/pypi/v/tt-connect.svg)](https://pypi.org/project/tt-connect/)
 [![Python](https://img.shields.io/pypi/pyversions/tt-connect.svg)](https://pypi.org/project/tt-connect/)
 [![License](https://img.shields.io/github/license/Tiny-Trader/connect.svg)](https://github.com/Tiny-Trader/connect/blob/main/LICENSE)
 
-`tt-connect` is a unified Python broker API for Indian markets. It gives you one canonical interface for auth, instruments, orders, portfolio, and reports across brokers.
+`tt-connect` is a unified Python broker API for Indian markets.
+It gives one canonical interface for auth, instruments, orders, portfolio, reports, and live market streaming across brokers.
+
+- Docs: https://tiny-trader.github.io/connect/
+- PyPI: https://pypi.org/project/tt-connect/
 
 ## Who This Is For
 
@@ -41,6 +46,7 @@ with TTConnect("zerodha", {"api_key": "...", "access_token": "..."}) as broker:
 
 | Guide | Description |
 |-------|-------------|
+| **[Live Docs Site](https://tiny-trader.github.io/connect/)** | Full user docs on GitHub Pages |
 | **[Quick Start](docs/QUICKSTART.md)** | Get installed and place your first order in 5 minutes |
 | **[Examples](docs/EXAMPLES.md)** | Complete working code for Zerodha and AngelOne |
 | [Contributor Guide](docs/CONTRIBUTOR_GUIDE.md) | Local setup, testing, implementation workflow |

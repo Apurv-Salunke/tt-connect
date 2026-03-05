@@ -112,6 +112,7 @@
   - Simplified docs theme to built-in `readthedocs` and removed custom theme assets/styles for a clean baseline.
   - Added `.github/workflows/docs-pages.yml` to deploy docs to GitHub Pages from `main`.
   - Fixed docs CI/Pages dependencies by installing `pymdown-extensions` where MkDocs runs.
+  - Updated repository README and About metadata with live docs/PyPI links and project summary.
 
 ## 0.2.4 - 2026-02-28
 
