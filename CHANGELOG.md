@@ -105,6 +105,7 @@
   - Added `make docs-serve` and `make docs-build` targets in `Makefile`.
   - Simplified docs theme to built-in `readthedocs` and removed custom theme assets/styles for a clean baseline.
   - Added `.github/workflows/docs-pages.yml` to deploy docs to GitHub Pages from `main`.
+  - Fixed docs CI/Pages dependencies by installing `pymdown-extensions` where MkDocs runs.
 
 ## 0.2.4 - 2026-02-28
 
