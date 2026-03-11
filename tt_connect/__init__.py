@@ -14,12 +14,7 @@ from tt_connect.core.models import (
     Index,
     Option,
     # Requests
-    GetHistoricalRequest,
     GttLeg,
-    ModifyGttRequest,
-    ModifyOrderRequest,
-    PlaceGttRequest,
-    PlaceOrderRequest,
     # Responses
     Candle,
     Gtt,
@@ -42,16 +37,10 @@ __all__ = [
     "AngelOneConfig",
     "ZerodhaConfig",
     "ConfigurationError",
-    # Order models
-    "PlaceOrderRequest",
-    "ModifyOrderRequest",
     # GTT models
-    "PlaceGttRequest",
-    "ModifyGttRequest",
     "GttLeg",
     "Gtt",
     # Historical
-    "GetHistoricalRequest",
     "Candle",
     "CandleInterval",
     # Quotes

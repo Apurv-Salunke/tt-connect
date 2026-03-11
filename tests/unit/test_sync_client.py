@@ -13,11 +13,7 @@ from tt_connect.core.models import (
     Gtt,
     GttLeg,
     Holding,
-    ModifyGttRequest,
-    ModifyOrderRequest,
     Order,
-    PlaceGttRequest,
-    PlaceOrderRequest,
     Position,
     Profile,
     Trade,
@@ -184,20 +180,25 @@ def test_get_trades(client_and_mock):
 
 def test_place_order(client_and_mock):
     client, mock_async = client_and_mock
-    req = PlaceOrderRequest(
+    result = client.place_order(
         instrument=INSTR, side=Side.BUY, qty=10,
         order_type=OrderType.MARKET, product=ProductType.CNC,
     )
-    result = client.place_order(req)
     assert result == "O1"
-    mock_async.place_order.assert_awaited_once_with(req)
+    mock_async.place_order.assert_awaited_once_with(
+        instrument=INSTR, side=Side.BUY, qty=10,
+        order_type=OrderType.MARKET, product=ProductType.CNC,
+        price=None, trigger_price=None, tag=None,
+    )
 
 
 def test_modify_order(client_and_mock):
     client, mock_async = client_and_mock
-    req = ModifyOrderRequest(order_id="O1", price=2900.0)
-    client.modify_order(req)
-    mock_async.modify_order.assert_awaited_once_with(req)
+    client.modify_order(order_id="O1", price=2900.0)
+    mock_async.modify_order.assert_awaited_once_with(
+        order_id="O1", qty=None, price=2900.0,
+        trigger_price=None, order_type=None,
+    )
 
 
 def test_cancel_order(client_and_mock):
@@ -243,25 +244,23 @@ def test_get_orders(client_and_mock):
 
 def test_place_gtt(client_and_mock):
     client, mock_async = client_and_mock
-    req = PlaceGttRequest(
-        instrument=INSTR, last_price=2800.0,
-        legs=[GttLeg(trigger_price=3000.0, price=3005.0, side=Side.SELL,
-                     qty=10, product=ProductType.CNC)],
-    )
-    result = client.place_gtt(req)
+    legs = [GttLeg(trigger_price=3000.0, price=3005.0, side=Side.SELL,
+                   qty=10, product=ProductType.CNC)]
+    result = client.place_gtt(instrument=INSTR, last_price=2800.0, legs=legs)
     assert result == "G1"
-    mock_async.place_gtt.assert_awaited_once_with(req)
+    mock_async.place_gtt.assert_awaited_once_with(
+        instrument=INSTR, last_price=2800.0, legs=legs,
+    )
 
 
 def test_modify_gtt(client_and_mock):
     client, mock_async = client_and_mock
-    req = ModifyGttRequest(
-        gtt_id="G1", instrument=INSTR, last_price=2800.0,
-        legs=[GttLeg(trigger_price=3100.0, price=3105.0, side=Side.SELL,
-                     qty=10, product=ProductType.CNC)],
+    legs = [GttLeg(trigger_price=3100.0, price=3105.0, side=Side.SELL,
+                   qty=10, product=ProductType.CNC)]
+    client.modify_gtt(gtt_id="G1", instrument=INSTR, last_price=2800.0, legs=legs)
+    mock_async.modify_gtt.assert_awaited_once_with(
+        gtt_id="G1", instrument=INSTR, last_price=2800.0, legs=legs,
     )
-    client.modify_gtt(req)
-    mock_async.modify_gtt.assert_awaited_once_with(req)
 
 
 def test_cancel_gtt(client_and_mock):

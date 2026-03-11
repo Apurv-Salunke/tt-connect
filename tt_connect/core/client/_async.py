@@ -5,19 +5,16 @@ from __future__ import annotations
 from datetime import date, datetime
 from typing import Any
 
-from tt_connect.core.models.enums import CandleInterval
+from tt_connect.core.models.enums import CandleInterval, OrderType, ProductType, Side
 from tt_connect.core.models.instruments import Equity, Future, Instrument, Option
 from tt_connect.core.client._lifecycle import LifecycleMixin
 from tt_connect.core.models import (
     Candle,
     Fund,
     Gtt,
+    GttLeg,
     Holding,
-    ModifyGttRequest,
-    ModifyOrderRequest,
     Order,
-    PlaceGttRequest,
-    PlaceOrderRequest,
     Position,
     Profile,
     Tick,
@@ -123,13 +120,40 @@ class AsyncTTConnect:
 
     # --- Orders ---
 
-    async def place_order(self, req: PlaceOrderRequest) -> str:
+    async def place_order(
+        self,
+        instrument: Instrument,
+        side: Side,
+        qty: int,
+        order_type: OrderType,
+        product: ProductType,
+        price: float | None = None,
+        trigger_price: float | None = None,
+        tag: str | None = None,
+    ) -> str:
         """Place an order. Returns broker order id."""
-        return await self._core.place_order(req)
+        from tt_connect.core.models.requests import PlaceOrderRequest
+        kw: dict[str, Any] = dict(instrument=instrument, side=side, qty=qty,
+                        order_type=order_type, product=product,
+                        price=price, trigger_price=trigger_price)
+        if tag is not None:
+            kw["tag"] = tag
+        return await self._core.place_order(PlaceOrderRequest(**kw))
 
-    async def modify_order(self, req: ModifyOrderRequest) -> None:
+    async def modify_order(
+        self,
+        order_id: str,
+        qty: int | None = None,
+        price: float | None = None,
+        trigger_price: float | None = None,
+        order_type: OrderType | None = None,
+    ) -> None:
         """Modify an existing order."""
-        await self._core.modify_order(req)
+        from tt_connect.core.models.requests import ModifyOrderRequest
+        await self._core.modify_order(ModifyOrderRequest(
+            order_id=order_id, qty=qty, price=price,
+            trigger_price=trigger_price, order_type=order_type,
+        ))
 
     async def cancel_order(self, order_id: str) -> None:
         """Cancel a single order by id."""
@@ -147,13 +171,31 @@ class AsyncTTConnect:
         """Fetch and normalize all orders."""
         return await self._core.get_orders()
 
-    async def place_gtt(self, req: PlaceGttRequest) -> str:
+    async def place_gtt(
+        self,
+        instrument: Instrument,
+        last_price: float,
+        legs: list[GttLeg],
+    ) -> str:
         """Place a GTT rule and return the broker GTT id."""
-        return await self._core.place_gtt(req)
+        from tt_connect.core.models.requests import PlaceGttRequest
+        return await self._core.place_gtt(PlaceGttRequest(
+            instrument=instrument, last_price=last_price, legs=legs,
+        ))
 
-    async def modify_gtt(self, req: ModifyGttRequest) -> None:
+    async def modify_gtt(
+        self,
+        gtt_id: str,
+        instrument: Instrument,
+        last_price: float,
+        legs: list[GttLeg],
+    ) -> None:
         """Modify an existing GTT rule."""
-        await self._core.modify_gtt(req)
+        from tt_connect.core.models.requests import ModifyGttRequest
+        await self._core.modify_gtt(ModifyGttRequest(
+            gtt_id=gtt_id, instrument=instrument,
+            last_price=last_price, legs=legs,
+        ))
 
     async def cancel_gtt(self, gtt_id: str) -> None:
         """Cancel / delete a GTT rule by id."""
