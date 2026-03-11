@@ -9,9 +9,9 @@ from typing import Any, Coroutine, TypeVar
 
 from datetime import date, datetime
 
-from tt_connect.core.models.enums import CandleInterval
+from tt_connect.core.models.enums import CandleInterval, OrderType, ProductType, Side
 from tt_connect.core.models.instruments import Equity, Future, Instrument, Option
-from tt_connect.core.models import Candle, Fund, Gtt, Holding, ModifyGttRequest, ModifyOrderRequest, Order, PlaceGttRequest, PlaceOrderRequest, Position, Profile, Tick, Trade
+from tt_connect.core.models import Candle, Fund, Gtt, GttLeg, Holding, Order, Position, Profile, Tick, Trade
 
 T = TypeVar("T")
 
@@ -80,11 +80,35 @@ class TTConnect:
     def get_trades(self) -> list[Trade]:
         return self._run(self._async.get_trades())
 
-    def place_order(self, req: PlaceOrderRequest) -> str:
-        return self._run(self._async.place_order(req))
+    def place_order(
+        self,
+        instrument: Instrument,
+        side: Side,
+        qty: int,
+        order_type: OrderType,
+        product: ProductType,
+        price: float | None = None,
+        trigger_price: float | None = None,
+        tag: str | None = None,
+    ) -> str:
+        return self._run(self._async.place_order(
+            instrument=instrument, side=side, qty=qty,
+            order_type=order_type, product=product,
+            price=price, trigger_price=trigger_price, tag=tag,
+        ))
 
-    def modify_order(self, req: ModifyOrderRequest) -> None:
-        self._run(self._async.modify_order(req))
+    def modify_order(
+        self,
+        order_id: str,
+        qty: int | None = None,
+        price: float | None = None,
+        trigger_price: float | None = None,
+        order_type: OrderType | None = None,
+    ) -> None:
+        self._run(self._async.modify_order(
+            order_id=order_id, qty=qty, price=price,
+            trigger_price=trigger_price, order_type=order_type,
+        ))
 
     def cancel_order(self, order_id: str) -> None:
         self._run(self._async.cancel_order(order_id))
@@ -101,11 +125,27 @@ class TTConnect:
     def get_orders(self) -> list[Order]:
         return self._run(self._async.get_orders())
 
-    def place_gtt(self, req: PlaceGttRequest) -> str:
-        return self._run(self._async.place_gtt(req))
+    def place_gtt(
+        self,
+        instrument: Instrument,
+        last_price: float,
+        legs: list[GttLeg],
+    ) -> str:
+        return self._run(self._async.place_gtt(
+            instrument=instrument, last_price=last_price, legs=legs,
+        ))
 
-    def modify_gtt(self, req: ModifyGttRequest) -> None:
-        self._run(self._async.modify_gtt(req))
+    def modify_gtt(
+        self,
+        gtt_id: str,
+        instrument: Instrument,
+        last_price: float,
+        legs: list[GttLeg],
+    ) -> None:
+        self._run(self._async.modify_gtt(
+            gtt_id=gtt_id, instrument=instrument,
+            last_price=last_price, legs=legs,
+        ))
 
     def cancel_gtt(self, gtt_id: str) -> None:
         self._run(self._async.cancel_gtt(gtt_id))

@@ -4,7 +4,6 @@ import httpx
 from tt_connect.core.client._async import AsyncTTConnect
 from tt_connect.core.models.enums import ClientState, Exchange, Side, ProductType, OrderType
 from tt_connect.core.models.instruments import Equity
-from tt_connect.core.models import PlaceOrderRequest
 
 
 async def _bootstrap_connected_state(broker) -> None:
@@ -114,14 +113,13 @@ async def test_client_place_order(zerodha_response, populated_db, monkeypatch, t
     broker._core._resolver = InstrumentResolver(populated_db, "zerodha")
     broker._core._state = ClientState.CONNECTED
 
-    req = PlaceOrderRequest(
+    order_id = await broker.place_order(
         instrument=Equity(exchange=Exchange.NSE, symbol="RELIANCE"),
         side=Side.BUY,
         qty=1,
         product=ProductType.CNC,
         order_type=OrderType.MARKET,
     )
-    order_id = await broker.place_order(req)
 
     assert order_id == "240221000000001"
     assert respx.calls.call_count == 1

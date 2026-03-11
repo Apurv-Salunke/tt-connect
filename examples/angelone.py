@@ -304,6 +304,8 @@ print()
 # 6. Order management (commented out — uncomment to execute)
 # ---------------------------------------------------------------------------
 
+from tt_connect.enums import Side, ProductType, OrderType  # noqa: E402, F401
+
 # Place a limit order
 # order_id = broker.place_order(
 #     instrument=Equity(exchange=Exchange.NSE, symbol="SBIN"),
@@ -316,7 +318,12 @@ print()
 # print(f"Placed order: {order_id}")
 
 # Modify it
-# broker.modify_order(order_id, price=801.00, order_type=OrderType.LIMIT, qty=1)
+# broker.modify_order(
+#     order_id=order_id,
+#     price=801.00,
+#     order_type=OrderType.LIMIT,
+#     qty=1,
+# )
 
 # Cancel a specific order
 # broker.cancel_order(order_id)
