@@ -20,7 +20,10 @@ from tt_connect.core.models.instruments import (
     Future,
     Index,
     Instrument,
+    InstrumentInfo,
     Option,
+    OptionChain,
+    OptionChainEntry,
 )
 from tt_connect.core.models.requests import (
     GetHistoricalRequest,
@@ -65,7 +68,10 @@ __all__ = [
     "Future",
     "Index",
     "Instrument",
+    "InstrumentInfo",
     "Option",
+    "OptionChain",
+    "OptionChainEntry",
     # Requests
     "GetHistoricalRequest",
     "GttLeg",

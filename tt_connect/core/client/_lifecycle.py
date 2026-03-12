@@ -47,6 +47,7 @@ class LifecycleMixin(_ClientBase):
         """Authenticate and initialize a fresh/stale-safe instrument resolver."""
         await self._adapter.login()
         await self._instrument_manager.init(self._adapter.fetch_instruments)
+        self._instrument_queries = self._instrument_manager.queries
         self._resolver = InstrumentResolver(
             self._instrument_manager.connection,
             self._broker_id,
