@@ -16,6 +16,7 @@ from tt_connect.core.adapter.ws import BrokerWebSocket
 from tt_connect.core.models.enums import ClientState
 from tt_connect.core.models.instruments import Instrument
 from tt_connect.core.store.manager import InstrumentManager
+from tt_connect.core.store.queries import InstrumentQueries
 from tt_connect.core.store.resolver import InstrumentResolver, ResolvedInstrument
 
 
@@ -39,6 +40,7 @@ class _ClientBase(ABC):
     _broker_id: str
     _adapter: BrokerAdapter
     _instrument_manager: InstrumentManager
+    _instrument_queries: InstrumentQueries
     _resolver: InstrumentResolver | None
     _ws: BrokerWebSocket | None
     _state: ClientState

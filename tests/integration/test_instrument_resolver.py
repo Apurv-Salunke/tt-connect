@@ -44,6 +44,15 @@ async def test_resolve_future(populated_db):
     ))
     assert resolved.token == "1000003"
 
+    # Derivative exchange form should also resolve so returned Future objects
+    # can be fed back into the client safely.
+    resolved = await resolver.resolve(Future(
+        exchange=Exchange.NFO,
+        symbol="NIFTY",
+        expiry=date(2026, 2, 26)
+    ))
+    assert resolved.token == "1000001"
+
 async def test_resolve_option(populated_db):
     resolver = InstrumentResolver(populated_db, "zerodha")
     resolved = await resolver.resolve(Option(
@@ -55,6 +64,15 @@ async def test_resolve_option(populated_db):
     ))
     assert resolved.token == "1000004"
     assert resolved.exchange == "NFO"
+
+    resolved = await resolver.resolve(Option(
+        exchange=Exchange.NFO,
+        symbol="NIFTY",
+        expiry=date(2026, 2, 26),
+        strike=23000.0,
+        option_type="CE"
+    ))
+    assert resolved.token == "1000004"
 
 async def test_resolve_unknown_raises(populated_db):
     resolver = InstrumentResolver(populated_db, "zerodha")

@@ -1,4 +1,4 @@
-"""SQLite-backed instrument manager — download, store, and query lifecycle.
+"""SQLite-backed instrument manager — refresh and staleness lifecycle.
 
 This module owns the full instrument data lifecycle:
 
@@ -8,9 +8,6 @@ This module owns the full instrument data lifecycle:
    in dependency-safe order (parent rows before FK children).
 3. **Staleness** — tracks ``last_updated`` in a ``_meta`` table; data older
    than today is considered stale and triggers a fresh download.
-4. **Query** — exposes high-level async methods for futures chains, option
-   chains, expiry lists, and symbol search.
-
 The manager never imports broker code directly. It accepts any object
 satisfying :class:`ParsedInstrumentsLike` via structural typing.
 """
@@ -23,10 +20,10 @@ from collections.abc import Awaitable, Callable
 from typing import Any, Protocol
 
 import aiosqlite
-from tt_connect.core.models.enums import Exchange, OnStale, OptionType
-from tt_connect.core.exceptions import TTConnectError, InstrumentManagerError
-from tt_connect.core.store.schema import get_connection, init_schema, truncate_all
-from tt_connect.core.models.instruments import Equity, Future, Instrument, Option
+from tt_connect.core.models.enums import OnStale
+from tt_connect.core.exceptions import InstrumentManagerError, InstrumentStoreNotInitializedError, TTConnectError
+from tt_connect.core.store.queries import InstrumentQueries
+from tt_connect.core.store.schema import get_connection, init_schema
 
 logger = logging.getLogger(__name__)
 
@@ -57,8 +54,6 @@ class InstrumentManager:
         - Open a per-broker SQLite database under ``_cache/``.
         - Check whether cached data is stale (not updated today).
         - Download and atomically replace instrument data when stale.
-        - Provide query methods for futures chains, option chains,
-          expiry calendars, and symbol search.
 
     The ``on_stale`` policy controls behavior when a refresh fails:
         - ``OnStale.FAIL`` — raise immediately (default, safest for prod).
@@ -77,6 +72,7 @@ class InstrumentManager:
         self._broker_id = broker_id
         self._on_stale = on_stale
         self._conn: aiosqlite.Connection | None = None
+        self._queries = InstrumentQueries(None)
 
     def _conn_or_raise(self) -> aiosqlite.Connection:
         """Return the active DB connection, or raise if ``init()`` was not called."""
@@ -87,8 +83,28 @@ class InstrumentManager:
     async def init(self, fetch_fn: Callable[[], Awaitable[ParsedInstrumentsLike]]) -> None:
         """Open DB, initialize schema, and ensure data freshness."""
         self._conn = await get_connection(self._broker_id)
-        await init_schema(self._conn_or_raise())
-        await self.ensure_fresh(fetch_fn)
+        try:
+            await init_schema(self._conn_or_raise())
+            await self.ensure_fresh(fetch_fn)
+        except Exception:
+            await self._cleanup_failed_init()
+            raise
+        self._queries.bind(self._conn)
+
+    async def open_existing(self) -> None:
+        """Open an existing local DB for read-only query use."""
+        self._conn = await get_connection(self._broker_id)
+        try:
+            await init_schema(self._conn_or_raise())
+            if not await self._has_any_data():
+                raise InstrumentStoreNotInitializedError(
+                    "Instrument DB not initialized. Initialize TTConnect or AsyncTTConnect first "
+                    "to seed or refresh instruments before using InstrumentStore."
+                )
+        except Exception:
+            await self._cleanup_failed_init()
+            raise
+        self._queries.bind(self._conn)
 
     async def ensure_fresh(self, fetch_fn: Callable[[], Awaitable[ParsedInstrumentsLike]]) -> None:
         """Refresh stale data; optionally fall back to cached data on failure.
@@ -122,50 +138,94 @@ class InstrumentManager:
     async def refresh(self, fetch_fn: Callable[[], Awaitable[ParsedInstrumentsLike]]) -> None:
         """Fetch broker instruments and atomically rebuild local tables."""
         logger.info(
-            f"Refreshing instruments for {self._broker_id}",
+            f"[{self._broker_id}] Downloading instrument master",
             extra={"event": "instruments.refresh.start", "broker": self._broker_id},
         )
         t0 = time.monotonic()
         parsed: ParsedInstrumentsLike = await fetch_fn()
-        await truncate_all(self._conn_or_raise())
-        await self._insert(parsed)
-        await self._set_last_updated()
+        conn = self._conn_or_raise()
+        try:
+            await conn.execute("BEGIN")
+            for table in ("broker_tokens", "equities", "futures", "options", "instruments"):
+                await conn.execute(f"DELETE FROM {table}")
+            await conn.execute("DELETE FROM _meta WHERE key = 'last_updated'")
+            counts = await self._insert(parsed)
+            await self._set_last_updated()
+            await conn.commit()
+        except Exception:
+            await conn.rollback()
+            raise
+        elapsed_ms = int((time.monotonic() - t0) * 1000)
         logger.info(
-            "Instrument refresh complete",
+            f"[{self._broker_id}] Instruments ready"
+            f" — {counts['indices']} indices · {counts['equities']} equities"
+            f" · {counts['futures']} futures · {counts['options']} options"
+            f" ({elapsed_ms}ms)",
             extra={
                 "event": "instruments.refresh.end",
                 "broker": self._broker_id,
-                "elapsed_ms": int((time.monotonic() - t0) * 1000),
+                "elapsed_ms": elapsed_ms,
+                **counts,
             },
         )
 
-    async def _insert(self, parsed: ParsedInstrumentsLike) -> None:
-        """Insert parsed instruments in dependency-safe order."""
+    async def _insert(self, parsed: ParsedInstrumentsLike) -> dict[str, int]:
+        """Insert parsed instruments in dependency-safe order.
+
+        Returns a count dict with keys: indices, equities, futures, options.
+        """
         # Chunk 1: indices — must exist before futures/options reference them
-        await self._insert_indices(parsed.indices)
+        n_idx = await self._insert_indices(parsed.indices)
 
         # Chunk 2: equities
-        await self._insert_equities(parsed.equities)
+        n_eq = await self._insert_equities(parsed.equities)
 
         # Chunk 3: futures — underlying_id resolved from lookup built after chunks 1+2
         lookup = await self._build_underlying_lookup()
-        await self._insert_futures(parsed.futures, lookup)
+        n_fut, missing_fut = await self._insert_futures(parsed.futures, lookup)
 
         # Chunk 4: options — same lookup, already built
-        await self._insert_options(parsed.options, lookup)
+        n_opt, missing_opt = await self._insert_options(parsed.options, lookup)
+        # Emit grouped DEBUG summaries for skipped instruments (expected for some
+        # brokers where certain BSE underlyings are absent from the instrument dump).
+        if missing_fut:
+            skipped = len(parsed.futures) - n_fut
+            logger.debug(
+                f"[{self._broker_id}] Skipped {skipped} futures"
+                f" — {len(missing_fut)} underlyings not in DB:"
+                f" {', '.join(sorted(missing_fut))}",
+                extra={
+                    "event": "instruments.skipped.futures",
+                    "broker": self._broker_id,
+                    "count": skipped,
+                    "underlyings": sorted(missing_fut),
+                },
+            )
+        if missing_opt:
+            skipped = len(parsed.options) - n_opt
+            logger.debug(
+                f"[{self._broker_id}] Skipped {skipped} options"
+                f" — {len(missing_opt)} underlyings not in DB:"
+                f" {', '.join(sorted(missing_opt))}",
+                extra={
+                    "event": "instruments.skipped.options",
+                    "broker": self._broker_id,
+                    "count": skipped,
+                    "underlyings": sorted(missing_opt),
+                },
+            )
 
-        await self._conn_or_raise().commit()
+        return {"indices": n_idx, "equities": n_eq, "futures": n_fut, "options": n_opt}
 
-    async def _insert_indices(self, indices: list[Any]) -> None:
+    async def _insert_indices(self, indices: list[Any]) -> int:
         """Insert index rows into ``instruments`` + ``equities`` + ``broker_tokens``.
 
         Indices are inserted first because futures and options hold foreign keys
         to their underlying, which may be an index (e.g. NIFTY, BANKNIFTY).
+        Returns the count of inserted rows.
         """
         if not indices:
-            return
-
-        logger.info(f"Inserting {len(indices)} indices")
+            return 0
 
         for idx in indices:
             # 1. Base instrument record
@@ -193,16 +253,17 @@ class InstrumentManager:
                 (instrument_id, self._broker_id, idx.broker_token, idx.broker_symbol),
             )
 
-    async def _insert_equities(self, equities: list[Any]) -> None:
+        return len(indices)
+
+    async def _insert_equities(self, equities: list[Any]) -> int:
         """Insert cash equity rows into ``instruments`` + ``equities`` + ``broker_tokens``.
 
         Inserted after indices so that the underlying lookup (used by futures
         and options) contains both indices and stocks.
+        Returns the count of inserted rows.
         """
         if not equities:
-            return
-
-        logger.info(f"Inserting {len(equities)} equities")
+            return 0
 
         for eq in equities:
             # 1. Base instrument record
@@ -230,6 +291,8 @@ class InstrumentManager:
                 (instrument_id, self._broker_id, eq.broker_token, eq.broker_symbol),
             )
 
+        return len(equities)
+
     async def _build_underlying_lookup(self) -> dict[tuple[str, str], int]:
         """
         Build a {(exchange, symbol) → instrument_id} dict from all rows currently
@@ -242,32 +305,30 @@ class InstrumentManager:
             rows = await cur.fetchall()
         return {(row[1], row[2]): row[0] for row in rows}
 
-    async def _insert_futures(self, futures: list[Any], lookup: dict[tuple[str, str], int]) -> None:
+    async def _insert_futures(
+        self, futures: list[Any], lookup: dict[tuple[str, str], int]
+    ) -> tuple[int, set[str]]:
         """Insert futures rows, resolving ``underlying_id`` from the lookup.
 
         Each future item must carry ``underlying_exchange`` (e.g. ``"NSE"``)
         so the FK to the parent index/equity can be resolved. Rows whose
-        underlying is missing from the DB are skipped with a warning.
+        underlying is missing from the DB are silently collected and returned
+        for a single grouped DEBUG log by the caller.
 
-        Args:
-            futures: Parsed future records from the broker's instrument dump.
-            lookup: ``{(exchange, symbol): instrument_id}`` built from
-                already-inserted indices + equities.
+        Returns:
+            (inserted_count, missing_underlyings) where missing_underlyings is
+            a set of ``"EXCHANGE:SYMBOL"`` strings for skipped rows.
         """
         if not futures:
-            return
+            return 0, set()
 
-        logger.info(f"Inserting {len(futures)} futures")
-        skipped = 0
+        inserted = 0
+        missing: set[str] = set()
 
         for fut in futures:
             underlying_id = lookup.get((fut.underlying_exchange, fut.symbol))
             if underlying_id is None:
-                logger.warning(
-                    f"Skipping {fut.broker_symbol}: underlying "
-                    f"({fut.underlying_exchange}, {fut.symbol}) not in DB"
-                )
-                skipped += 1
+                missing.add(f"{fut.underlying_exchange}:{fut.symbol}")
                 continue
 
             # 1. Base instrument record
@@ -294,35 +355,32 @@ class InstrumentManager:
                 """,
                 (instrument_id, self._broker_id, fut.broker_token, fut.broker_symbol),
             )
+            inserted += 1
 
-        if skipped:
-            logger.warning(f"Skipped {skipped} futures due to unresolved underlyings")
+        return inserted, missing
 
-    async def _insert_options(self, options: list[Any], lookup: dict[tuple[str, str], int]) -> None:
+    async def _insert_options(
+        self, options: list[Any], lookup: dict[tuple[str, str], int]
+    ) -> tuple[int, set[str]]:
         """Insert options rows, resolving ``underlying_id`` from the lookup.
 
         Same resolution logic as ``_insert_futures``. Each option item must
         additionally carry ``strike`` and ``option_type`` (``"CE"`` / ``"PE"``).
 
-        Args:
-            options: Parsed option records from the broker's instrument dump.
-            lookup: ``{(exchange, symbol): instrument_id}`` built from
-                already-inserted indices + equities.
+        Returns:
+            (inserted_count, missing_underlyings) where missing_underlyings is
+            a set of ``"EXCHANGE:SYMBOL"`` strings for skipped rows.
         """
         if not options:
-            return
+            return 0, set()
 
-        logger.info(f"Inserting {len(options)} options")
-        skipped = 0
+        inserted = 0
+        missing: set[str] = set()
 
         for opt in options:
             underlying_id = lookup.get((opt.underlying_exchange, opt.symbol))
             if underlying_id is None:
-                logger.warning(
-                    f"Skipping {opt.broker_symbol}: underlying "
-                    f"({opt.underlying_exchange}, {opt.symbol}) not in DB"
-                )
-                skipped += 1
+                missing.add(f"{opt.underlying_exchange}:{opt.symbol}")
                 continue
 
             # 1. Base instrument record
@@ -352,9 +410,9 @@ class InstrumentManager:
                 """,
                 (instrument_id, self._broker_id, opt.broker_token, opt.broker_symbol),
             )
+            inserted += 1
 
-        if skipped:
-            logger.warning(f"Skipped {skipped} options due to unresolved underlyings")
+        return inserted, missing
 
     async def _has_any_data(self) -> bool:
         """Return True if the local instrument DB already has at least one row."""
@@ -378,133 +436,18 @@ class InstrumentManager:
             "INSERT OR REPLACE INTO _meta(key, value) VALUES ('last_updated', ?)",
             (date.today().isoformat(),),
         )
-        await self._conn_or_raise().commit()
 
-    # ---------------------------------------------------------------------------
-    # Instrument master queries
-    # ---------------------------------------------------------------------------
+    async def _cleanup_failed_init(self) -> None:
+        """Close and unbind the connection after an init/open failure."""
+        self._queries.bind(None)
+        if self._conn is not None:
+            await self._conn.close()
+            self._conn = None
 
-    async def get_futures(self, underlying: Instrument) -> list[Future]:
-        """Return all active futures for an underlying instrument, sorted by expiry."""
-        query = """
-            SELECT u.exchange, u.symbol, f.expiry
-            FROM instruments fut
-            JOIN futures f     ON f.instrument_id = fut.id
-            JOIN instruments u ON u.id = f.underlying_id
-            WHERE u.exchange = ? AND u.symbol = ?
-            ORDER BY f.expiry ASC
-        """
-        async with self._conn_or_raise().execute(
-            query, (str(underlying.exchange), underlying.symbol)
-        ) as cur:
-            rows = await cur.fetchall()
-        return [
-            Future(
-                exchange=Exchange(row[0]),
-                symbol=row[1],
-                expiry=date.fromisoformat(row[2]),
-            )
-            for row in rows
-        ]
-
-    async def get_options(
-        self,
-        underlying: Instrument,
-        expiry: date | None = None,
-    ) -> list[Option]:
-        """Return options for an underlying, optionally filtered by expiry.
-
-        Results are sorted by expiry → strike → option_type (CE before PE).
-        """
-        if expiry is not None:
-            query = """
-                SELECT u.exchange, u.symbol, o.expiry, o.strike, o.option_type
-                FROM instruments opt
-                JOIN options o     ON o.instrument_id = opt.id
-                JOIN instruments u ON u.id = o.underlying_id
-                WHERE u.exchange = ? AND u.symbol = ? AND o.expiry = ?
-                ORDER BY o.expiry ASC, o.strike ASC, o.option_type ASC
-            """
-            params: tuple[Any, ...] = (str(underlying.exchange), underlying.symbol, expiry.isoformat())
-        else:
-            query = """
-                SELECT u.exchange, u.symbol, o.expiry, o.strike, o.option_type
-                FROM instruments opt
-                JOIN options o     ON o.instrument_id = opt.id
-                JOIN instruments u ON u.id = o.underlying_id
-                WHERE u.exchange = ? AND u.symbol = ?
-                ORDER BY o.expiry ASC, o.strike ASC, o.option_type ASC
-            """
-            params = (str(underlying.exchange), underlying.symbol)
-        async with self._conn_or_raise().execute(query, params) as cur:
-            rows = await cur.fetchall()
-        return [
-            Option(
-                exchange=Exchange(row[0]),
-                symbol=row[1],
-                expiry=date.fromisoformat(row[2]),
-                strike=float(row[3]),
-                option_type=OptionType(row[4]),
-            )
-            for row in rows
-        ]
-
-    async def get_expiries(self, underlying: Instrument) -> list[date]:
-        """Return all distinct expiry dates for an underlying across futures and options."""
-        query = """
-            SELECT DISTINCT expiry FROM (
-                SELECT f.expiry FROM futures f
-                JOIN instruments u ON u.id = f.underlying_id
-                WHERE u.exchange = ? AND u.symbol = ?
-                UNION
-                SELECT o.expiry FROM options o
-                JOIN instruments u ON u.id = o.underlying_id
-                WHERE u.exchange = ? AND u.symbol = ?
-            )
-            ORDER BY expiry ASC
-        """
-        async with self._conn_or_raise().execute(
-            query,
-            (str(underlying.exchange), underlying.symbol,
-             str(underlying.exchange), underlying.symbol),
-        ) as cur:
-            rows = await cur.fetchall()
-        return [date.fromisoformat(row[0]) for row in rows]
-
-    async def search_instruments(
-        self,
-        query: str,
-        exchange: str | None = None,
-    ) -> list[Equity]:
-        """Search underlyings (equities + indices) by symbol substring.
-
-        Matching is case-insensitive. Results are sorted by exchange then symbol
-        and capped at 50 entries.
-        """
-        pattern = f"%{query.upper()}%"
-        if exchange is not None:
-            sql = """
-                SELECT i.exchange, i.symbol
-                FROM instruments i
-                JOIN equities e ON e.instrument_id = i.id
-                WHERE UPPER(i.symbol) LIKE ? AND i.exchange = ?
-                ORDER BY i.exchange, i.symbol
-                LIMIT 50
-            """
-            params: tuple[Any, ...] = (pattern, exchange)
-        else:
-            sql = """
-                SELECT i.exchange, i.symbol
-                FROM instruments i
-                JOIN equities e ON e.instrument_id = i.id
-                WHERE UPPER(i.symbol) LIKE ?
-                ORDER BY i.exchange, i.symbol
-                LIMIT 50
-            """
-            params = (pattern,)
-        async with self._conn_or_raise().execute(sql, params) as cur:
-            rows = await cur.fetchall()
-        return [Equity(exchange=Exchange(row[0]), symbol=row[1]) for row in rows]
+    @property
+    def queries(self) -> InstrumentQueries:
+        """Expose the bound read-only query layer."""
+        return self._queries
 
     @property
     def connection(self) -> aiosqlite.Connection:

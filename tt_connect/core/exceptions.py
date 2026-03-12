@@ -87,3 +87,9 @@ class InstrumentManagerError(TTConnectError):
     """InstrumentManager not initialized. Call init() first."""
 
     retryable = False
+
+
+class InstrumentStoreNotInitializedError(TTConnectError):
+    """Instrument DB is unavailable for read-only store access."""
+
+    retryable = False

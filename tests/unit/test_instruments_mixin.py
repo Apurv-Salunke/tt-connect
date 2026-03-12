@@ -37,7 +37,7 @@ def _make_client() -> InstrumentsMixin:
             return ResolvedInstrument(token="1", broker_symbol="SBIN", exchange="NSE")
 
     client: _Fake = object.__new__(_Fake)
-    client._instrument_manager = MagicMock()
+    client._instrument_queries = MagicMock()
     return client
 
 
@@ -47,17 +47,17 @@ def _make_client() -> InstrumentsMixin:
 
 async def test_get_futures_delegates_to_manager():
     client = _make_client()
-    client._instrument_manager.get_futures = AsyncMock(return_value=FUTURES)
+    client._instrument_queries.get_futures = AsyncMock(return_value=FUTURES)
 
     result = await client.get_futures(SBIN)
 
     assert result == FUTURES
-    client._instrument_manager.get_futures.assert_awaited_once_with(SBIN)
+    client._instrument_queries.get_futures.assert_awaited_once_with(SBIN)
 
 
 async def test_get_futures_returns_empty_list():
     client = _make_client()
-    client._instrument_manager.get_futures = AsyncMock(return_value=[])
+    client._instrument_queries.get_futures = AsyncMock(return_value=[])
 
     result = await client.get_futures(SBIN)
 
@@ -70,23 +70,23 @@ async def test_get_futures_returns_empty_list():
 
 async def test_get_options_no_expiry_filter():
     client = _make_client()
-    client._instrument_manager.get_options = AsyncMock(return_value=OPTIONS)
+    client._instrument_queries.get_options = AsyncMock(return_value=OPTIONS)
 
     result = await client.get_options(SBIN)
 
     assert result == OPTIONS
-    client._instrument_manager.get_options.assert_awaited_once_with(SBIN, None)
+    client._instrument_queries.get_options.assert_awaited_once_with(SBIN, None)
 
 
 async def test_get_options_with_expiry_filter():
     client = _make_client()
     filtered = [o for o in OPTIONS if o.expiry == EXP1]
-    client._instrument_manager.get_options = AsyncMock(return_value=filtered)
+    client._instrument_queries.get_options = AsyncMock(return_value=filtered)
 
     result = await client.get_options(SBIN, expiry=EXP1)
 
     assert all(o.expiry == EXP1 for o in result)
-    client._instrument_manager.get_options.assert_awaited_once_with(SBIN, EXP1)
+    client._instrument_queries.get_options.assert_awaited_once_with(SBIN, EXP1)
 
 
 # ---------------------------------------------------------------------------
@@ -95,17 +95,17 @@ async def test_get_options_with_expiry_filter():
 
 async def test_get_expiries_returns_sorted_dates():
     client = _make_client()
-    client._instrument_manager.get_expiries = AsyncMock(return_value=[EXP1, EXP2])
+    client._instrument_queries.get_expiries = AsyncMock(return_value=[EXP1, EXP2])
 
     result = await client.get_expiries(SBIN)
 
     assert result == [EXP1, EXP2]
-    client._instrument_manager.get_expiries.assert_awaited_once_with(SBIN)
+    client._instrument_queries.get_expiries.assert_awaited_once_with(SBIN)
 
 
 async def test_get_expiries_empty_when_no_derivatives():
     client = _make_client()
-    client._instrument_manager.get_expiries = AsyncMock(return_value=[])
+    client._instrument_queries.get_expiries = AsyncMock(return_value=[])
 
     result = await client.get_expiries(Equity(exchange="NSE", symbol="SMALLCAP"))
 
@@ -119,21 +119,20 @@ async def test_get_expiries_empty_when_no_derivatives():
 async def test_search_instruments_delegates_to_manager():
     client = _make_client()
     expected = [Equity(exchange="NSE", symbol="SBIN")]
-    client._instrument_manager.search_instruments = AsyncMock(return_value=expected)
+    client._instrument_queries.search_instruments = AsyncMock(return_value=expected)
 
     result = await client.search_instruments("SBI")
 
     assert result == expected
-    client._instrument_manager.search_instruments.assert_awaited_once_with("SBI", None)
+    client._instrument_queries.search_instruments.assert_awaited_once_with("SBI", None)
 
 
 async def test_search_instruments_with_exchange_filter():
     client = _make_client()
     expected = [Equity(exchange="NSE", symbol="RELIANCE")]
-    client._instrument_manager.search_instruments = AsyncMock(return_value=expected)
+    client._instrument_queries.search_instruments = AsyncMock(return_value=expected)
 
     result = await client.search_instruments("REL", exchange="NSE")
 
     assert result == expected
-    client._instrument_manager.search_instruments.assert_awaited_once_with("REL", "NSE")
-
+    client._instrument_queries.search_instruments.assert_awaited_once_with("REL", "NSE")

@@ -4,7 +4,7 @@ from __future__ import annotations
 
 from datetime import date
 
-from tt_connect.core.models.instruments import Equity, Future, Instrument, Option
+from tt_connect.core.models.instruments import Equity, Future, Index, Instrument, Option
 from tt_connect.core.client._base import _ClientBase
 
 
@@ -21,7 +21,7 @@ class InstrumentsMixin(_ClientBase):
             # → [Future(exchange=NSE, symbol='SBIN', expiry=date(2025, 3, 27)), ...]
         """
         self._require_connected()
-        return await self._instrument_manager.get_futures(instrument)
+        return await self._instrument_queries.get_futures(instrument)
 
     async def get_options(
         self,
@@ -41,7 +41,7 @@ class InstrumentsMixin(_ClientBase):
             #    Option(..., strike=700.0, option_type='PE'), ...]
         """
         self._require_connected()
-        return await self._instrument_manager.get_options(instrument, expiry)
+        return await self._instrument_queries.get_options(instrument, expiry)
 
     async def get_expiries(self, instrument: Instrument) -> list[date]:
         """Return all distinct expiry dates available for an underlying.
@@ -55,13 +55,13 @@ class InstrumentsMixin(_ClientBase):
             # → [date(2025, 1, 30), date(2025, 2, 27), ...]
         """
         self._require_connected()
-        return await self._instrument_manager.get_expiries(instrument)
+        return await self._instrument_queries.get_expiries(instrument)
 
     async def search_instruments(
         self,
         query: str,
         exchange: str | None = None,
-    ) -> list[Equity]:
+    ) -> list[Equity | Index]:
         """Search the instrument master by symbol substring (case-insensitive).
 
         Returns up to 50 matching underlyings sorted by exchange then symbol.
@@ -76,5 +76,4 @@ class InstrumentsMixin(_ClientBase):
             # → [Equity(exchange=NSE, symbol='RELIANCE')]
         """
         self._require_connected()
-        return await self._instrument_manager.search_instruments(query, exchange)
-
+        return await self._instrument_queries.search_instruments(query, exchange)

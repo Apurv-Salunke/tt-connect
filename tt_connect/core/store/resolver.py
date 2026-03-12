@@ -143,10 +143,15 @@ class InstrumentResolver:
             JOIN futures f        ON f.instrument_id  = fut.id
             JOIN instruments u    ON u.id             = f.underlying_id
             JOIN broker_tokens bt ON bt.instrument_id = fut.id
-            WHERE u.exchange = ? AND u.symbol = ? AND f.expiry = ? AND bt.broker_id = ?
+            WHERE (u.exchange = ? OR fut.exchange = ?)
+              AND u.symbol = ? AND f.expiry = ? AND bt.broker_id = ?
         """
         async with self._conn.execute(query, (
-            instrument.exchange, instrument.symbol, instrument.expiry.isoformat(), self._broker_id
+            instrument.exchange,
+            instrument.exchange,
+            instrument.symbol,
+            instrument.expiry.isoformat(),
+            self._broker_id,
         )) as cur:
             row = await cur.fetchone()
         if not row:
@@ -168,12 +173,18 @@ class InstrumentResolver:
             JOIN options o        ON o.instrument_id  = opt.id
             JOIN instruments u    ON u.id             = o.underlying_id
             JOIN broker_tokens bt ON bt.instrument_id = opt.id
-            WHERE u.exchange = ? AND u.symbol = ? AND o.expiry = ?
+            WHERE (u.exchange = ? OR opt.exchange = ?)
+              AND u.symbol = ? AND o.expiry = ?
               AND o.strike = ? AND o.option_type = ? AND bt.broker_id = ?
         """
         async with self._conn.execute(query, (
-            instrument.exchange, instrument.symbol, instrument.expiry.isoformat(),
-            instrument.strike, instrument.option_type, self._broker_id
+            instrument.exchange,
+            instrument.exchange,
+            instrument.symbol,
+            instrument.expiry.isoformat(),
+            instrument.strike,
+            instrument.option_type,
+            self._broker_id,
         )) as cur:
             row = await cur.fetchone()
         if not row:

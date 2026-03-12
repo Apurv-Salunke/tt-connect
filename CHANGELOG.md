@@ -14,6 +14,9 @@
 - Added explicit `Apache-2.0` package metadata in `pyproject.toml`.
 - Updated compliance guidance to clarify Apache-2.0 redistribution obligations, including license/attribution preservation on redistributed source or binaries, and that it does not require publishing source code for network or hosted use.
 - Tightened trademark policy to protect `Tiny Traders`, `TT`, and `tt-connect` branding while keeping code reuse permissive under Apache-2.0.
+- Added stable public import modules for instruments, enums, and exceptions so the strict typed API can be imported through `tt_connect.instruments`, `tt_connect.enums`, and `tt_connect.exceptions`.
+- Added a public local `InstrumentStore` / `AsyncInstrumentStore` discovery surface over the broker instrument cache, while keeping broker auth and daily refresh ownership with `TTConnect` / `AsyncTTConnect`.
+- Refactored store internals to separate refresh lifecycle from read-only discovery queries, and consolidated store-side flat list lookups under `list_instruments(...)` with strict canonical filters.
 - **Breaking: public order/GTT methods now accept keyword arguments instead of request objects.**
   `place_order`, `modify_order`, `place_gtt`, and `modify_gtt` on both `AsyncTTConnect` and `TTConnect`
   no longer accept a single request-object argument. Pass fields directly as keyword arguments:
