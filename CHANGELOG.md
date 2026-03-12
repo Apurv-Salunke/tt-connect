@@ -1,5 +1,11 @@
 # Changelog
 
+## 0.5.1 - 2026-03-12
+
+- Bump: **patch**
+- Source PR: #43 Fix/apache license trademark
+
+
 ## [Unreleased]
 
 ### Changed
