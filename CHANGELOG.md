@@ -1,5 +1,11 @@
 # Changelog
 
+## 0.6.0 - 2026-03-12
+
+- Bump: **minor**
+- Source PR: #44 feat: add public instrument store discovery surface
+
+
 ## 0.5.1 - 2026-03-12
 
 - Bump: **patch**
