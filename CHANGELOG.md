@@ -1,5 +1,11 @@
 # Changelog
 
+## 0.6.1 - 2026-03-13
+
+- Bump: **patch**
+- Source PR: #45 feat: enforce IST-aware datetimes across all broker surfaces
+
+
 ## 0.6.0 - 2026-03-12
 
 - Bump: **minor**
