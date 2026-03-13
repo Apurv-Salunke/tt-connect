@@ -172,7 +172,11 @@ class AngelOneWebSocket(BrokerWebSocket):
             "x-feed-token":   self._auth._session.feed_token or "",
         }
 
-        async with websockets.connect(_WS_URL, additional_headers=headers) as ws:
+        async with websockets.connect(
+            _WS_URL,
+            additional_headers=headers,
+            ping_interval=None,  # AngelOne uses text "ping" frames — disable library ping/pong
+        ) as ws:
             self._ws = ws
             logger.info("AngelOne WS connected", extra={"event": "ws.connect", "broker": "angelone"})
 
