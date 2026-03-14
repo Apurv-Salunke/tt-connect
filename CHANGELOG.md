@@ -20,7 +20,31 @@
 
 ## [Unreleased]
 
+### Added
+
+- **Feed health observability** — both Zerodha and AngelOne now expose identical feed-health
+  machinery. New public API on `AsyncTTConnect`:
+  - `broker.feed_state` — returns a `FeedState` enum value: `CONNECTING`, `CONNECTED`,
+    `STALE`, `RECONNECTING`, or `CLOSED`
+  - `broker.last_tick_at(instrument)` — IST wall-clock time of the last tick received for
+    a specific instrument, or `None` if no tick has arrived yet
+- **`on_stale` / `on_recovered` callbacks** — `subscribe()` now accepts two optional async
+  callbacks. `on_stale` fires when no tick is received for 30 seconds; `on_recovered` fires
+  on the first tick after a stale period. Both work identically across brokers and survive
+  reconnects.
+- **`FeedState` enum** — importable from `tt_connect.enums`.
+
 ### Changed
+
+- `BrokerWebSocket` base class now contains all shared lifecycle and feed-health logic
+  (reconnect loop, staleness detection, `_record_tick`, `_staleness_loop`). Broker
+  subclasses implement only the broker-specific hooks (binary parsing, auth headers,
+  ping mechanism). No public API change.
+- Zerodha WebSocket now has full feed-health parity with AngelOne: staleness detection,
+  `on_stale` / `on_recovered` callbacks, and `feed_state` / `last_tick_at` work on
+  Zerodha subscriptions as well.
+- AngelOne WebSocket: replaced `_ping_loop` with the shared `_staleness_loop` from the
+  base class. Behaviour is unchanged — text `"ping"` frames are still sent every 10 seconds.
 
 - All datetime fields across the public API are now **IST-aware** (`UTC+05:30`).
   A shared `IST` constant and `ISTDatetime` Pydantic type live in

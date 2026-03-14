@@ -5,7 +5,6 @@ from __future__ import annotations
 from datetime import date, datetime
 from typing import Any
 
-from tt_connect.core.models.enums import CandleInterval, OrderType, ProductType, Side
 from tt_connect.core.models.instruments import Equity, Future, Index, Instrument, Option
 from tt_connect.core.client._lifecycle import LifecycleMixin
 from tt_connect.core.models import (
@@ -24,7 +23,8 @@ from tt_connect.core.client._orders import OrdersMixin
 from tt_connect.core.client._portfolio import PortfolioMixin
 from tt_connect.core.client._sync import TTConnect
 from tt_connect.core.client._instruments import InstrumentsMixin
-from tt_connect.core.adapter.ws import OnTick
+from tt_connect.core.models.enums import CandleInterval, FeedState, OrderType, ProductType, Side
+from tt_connect.core.adapter.ws import OnTick, OnFeedStale, OnFeedRecovered
 
 __all__ = ["AsyncTTConnect", "TTConnect"]
 
@@ -74,9 +74,24 @@ class AsyncTTConnect:
         """Close WebSocket (if open), instrument DB connection, and HTTP client."""
         await self._core.close()
 
-    async def subscribe(self, instruments: list[Instrument], on_tick: OnTick) -> None:
+    @property
+    def feed_state(self) -> FeedState:
+        """Current WebSocket feed state. Returns CLOSED if no subscription is active."""
+        return self._core.feed_state
+
+    def last_tick_at(self, instrument: Instrument) -> datetime | None:
+        """Wall-clock IST time of the last tick received for an instrument, or None."""
+        return self._core.last_tick_at(instrument)
+
+    async def subscribe(
+        self,
+        instruments: list[Instrument],
+        on_tick: OnTick,
+        on_stale: OnFeedStale | None = None,
+        on_recovered: OnFeedRecovered | None = None,
+    ) -> None:
         """Subscribe to ticks for canonical instruments."""
-        await self._core.subscribe(instruments, on_tick)
+        await self._core.subscribe(instruments, on_tick, on_stale=on_stale, on_recovered=on_recovered)
 
     async def unsubscribe(self, instruments: list[Instrument]) -> None:
         """Unsubscribe previously subscribed instruments."""

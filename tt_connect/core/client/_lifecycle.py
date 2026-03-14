@@ -3,17 +3,18 @@
 from __future__ import annotations
 
 import logging
+from datetime import datetime
 from typing import Any, Self
 
 from tt_connect.core.adapter.base import BrokerAdapter
 from tt_connect.core.client._base import _ClientBase
-from tt_connect.core.models.enums import ClientState, OnStale
+from tt_connect.core.models.enums import ClientState, FeedState, OnStale
 from tt_connect.core.exceptions import ClientClosedError, ClientNotConnectedError
 from tt_connect.core.store.manager import InstrumentManager
 from tt_connect.core.store.queries import InstrumentQueries
 from tt_connect.core.store.resolver import InstrumentResolver, ResolvedInstrument
 from tt_connect.core.models.instruments import Instrument
-from tt_connect.core.adapter.ws import BrokerWebSocket, OnTick
+from tt_connect.core.adapter.ws import BrokerWebSocket, OnTick, OnFeedStale, OnFeedRecovered
 from tt_connect.core.logging import log_deprecated_config_keys, log_package_startup
 
 logger = logging.getLogger(__name__)
@@ -92,10 +93,21 @@ class LifecycleMixin(_ClientBase):
 
     # --- Streaming ---
 
+    @property
+    def feed_state(self) -> FeedState:
+        """Current WebSocket feed state. Returns CLOSED if no subscription is active."""
+        return self._ws.feed_state if self._ws else FeedState.CLOSED
+
+    def last_tick_at(self, instrument: Instrument) -> datetime | None:
+        """Wall-clock IST time of the last tick received for an instrument."""
+        return self._ws.last_tick_at(instrument) if self._ws else None
+
     async def subscribe(
         self,
         instruments: list[Instrument],
         on_tick: OnTick,
+        on_stale: OnFeedStale | None = None,
+        on_recovered: OnFeedRecovered | None = None,
     ) -> None:
         """Subscribe to ticks for canonical instruments."""
         self._require_connected()
@@ -104,7 +116,7 @@ class LifecycleMixin(_ClientBase):
         subscriptions = [
             (instrument, await self._resolve(instrument)) for instrument in instruments
         ]
-        await self._ws.subscribe(subscriptions, on_tick)
+        await self._ws.subscribe(subscriptions, on_tick, on_stale=on_stale, on_recovered=on_recovered)
 
     async def unsubscribe(self, instruments: list[Instrument]) -> None:
         """Unsubscribe previously subscribed instruments."""
