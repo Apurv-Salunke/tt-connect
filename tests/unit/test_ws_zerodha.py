@@ -262,9 +262,10 @@ async def test_on_tick_exception_is_logged_and_stream_continues(
     caplog: pytest.LogCaptureFixture,
 ) -> None:
     import logging
-    from unittest.mock import patch
+    from unittest.mock import patch, AsyncMock, MagicMock as MM
 
     ws = ZerodhaWebSocket(api_key="key", access_token="tok")
+    ws._staleness_loop = AsyncMock(return_value=None)  # type: ignore[method-assign]
     calls = 0
 
     async def on_tick(tick: object) -> None:
@@ -274,7 +275,8 @@ async def test_on_tick_exception_is_logged_and_stream_continues(
             raise RuntimeError("boom")
 
     ws._on_tick = on_tick
-    ws._parse_binary_message = lambda _m: [object(), object()]  # type: ignore[method-assign]
+    mock_tick = MM()
+    ws._parse_binary_message = lambda _m: [mock_tick, mock_tick]  # type: ignore[method-assign]
 
     with patch("tt_connect.brokers.zerodha.ws.websockets.connect", return_value=_FakeWs([b"ab"])):
         with caplog.at_level(logging.ERROR, logger="tt_connect.brokers.zerodha.ws"):
