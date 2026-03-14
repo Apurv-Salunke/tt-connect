@@ -15,6 +15,12 @@ This guide gets you from zero to placing live orders with `tt-connect`.
 ## Step 1: Install
 
 ```bash
+pip install tt-connect
+```
+
+Or install from source for local development:
+
+```bash
 cd connect
 poetry install
 ```
@@ -68,14 +74,17 @@ export ANGELONE_TOTP_SECRET=JBSWY3DPEHPK3PXP
 ### Where to Get Credentials
 
 **Zerodha:**
-1. Register app at https://kite.trade/
-2. Complete OAuth login flow to get `access_token`
-3. Use `dev/get_token.py` for automated token generation
+1. Register app at https://kite.trade/ to get your `api_key` and `api_secret`
+2. Each trading day, complete the OAuth login flow to get a fresh `access_token`:
+   - Visit `https://kite.trade/connect/login?api_key=<your_api_key>&v=3`
+   - Log in and authorize — you'll be redirected to your redirect URL with `?request_token=<token>`
+   - Exchange the `request_token` for an `access_token` using the Kite Connect SDK or API
+3. Tokens expire at the end of each trading day (SEBI requirement) — the login flow must be repeated daily
 
 **AngelOne:**
-1. Register at https://smartapi.angelbroking.com/
-2. Enable TOTP in app settings and note the Base32 secret
-3. For manual mode, extract `jwtToken` from login response
+1. Register at https://smartapi.angelbroking.com/ to get your `api_key`
+2. Enable TOTP in the AngelOne mobile app (Profile → Settings → Enable TOTP) — when prompted, instead of scanning with your authenticator app, tap "Copy key" or "Show secret" to get the Base32 secret string (looks like `JBSWY3DPEHPK3PXP`) — use this as `totp_secret`
+3. Tokens expire daily at midnight IST — auto mode re-authenticates on the next `init()` call; manual mode requires you to supply a fresh `access_token` each day
 
 ---
 
@@ -127,6 +136,11 @@ broker.close()  # Always close when done
 - Calling methods before the client is connected raises `ClientNotConnectedError`
 - Calling methods after `close()` raises `ClientClosedError`
 
+**Session Expiry:** All broker tokens expire at end-of-day (SEBI requirement). Each new trading day you must supply fresh credentials:
+- **Zerodha:** repeat the OAuth flow to get a new `access_token`
+- **AngelOne (auto mode):** tt-connect re-authenticates automatically on the next `init()` call
+- **AngelOne (manual mode):** supply a fresh `access_token` each day
+
 ---
 
 ## Step 4: Get Profile and Funds
@@ -153,25 +167,24 @@ with TTConnect("zerodha", config) as broker:
 ## Step 5: Place Your First Order
 
 ```python
-from tt_connect import TTConnect, PlaceOrderRequest
+from tt_connect import TTConnect
 from tt_connect.instruments import Equity
 from tt_connect.enums import Exchange, Side, ProductType, OrderType
 
 with TTConnect("zerodha", config) as broker:
-    req = PlaceOrderRequest(
+    order_id = broker.place_order(
         instrument=Equity(exchange=Exchange.NSE, symbol="RELIANCE"),
         side=Side.BUY,
         qty=1,
         order_type=OrderType.MARKET,
         product=ProductType.CNC,
     )
-    order_id = broker.place_order(req)
     print(f"Order placed: {order_id}")
 ```
 
 **Limit Order:**
 ```python
-req = PlaceOrderRequest(
+order_id = broker.place_order(
     instrument=Equity(exchange=Exchange.NSE, symbol="SBIN"),
     side=Side.BUY,
     qty=10,
@@ -179,7 +192,6 @@ req = PlaceOrderRequest(
     product=ProductType.CNC,
     price=800.00,
 )
-order_id = broker.place_order(req)
 ```
 
 ---
@@ -187,14 +199,12 @@ order_id = broker.place_order(req)
 ## Step 6: Modify or Cancel Orders
 
 ```python
-from tt_connect import ModifyOrderRequest
-
 # Modify order
-broker.modify_order(ModifyOrderRequest(
+broker.modify_order(
     order_id=order_id,
     price=801.00,
     qty=10,
-))
+)
 
 # Cancel order
 broker.cancel_order(order_id)
@@ -220,9 +230,12 @@ for p in positions:
     print(f"{p.instrument.symbol}: qty={p.qty}, pnl=₹{p.pnl:.2f}")
 
 # Order book
+# Note: o.instrument is always None from get_orders() — broker APIs do not
+# return enough data to reconstruct an Instrument without an extra DB lookup.
 orders = broker.get_orders()
 for o in orders:
-    print(f"{o.id}: {o.instrument.symbol} {o.side} qty={o.qty} status={o.status}")
+    sym = o.instrument.symbol if o.instrument else "—"
+    print(f"{o.id}: {sym} {o.side} qty={o.qty} status={o.status}")
 
 # Trade book (executed orders)
 trades = broker.get_trades()
@@ -350,7 +363,8 @@ from tt_connect.enums import Exchange
 gold = Equity(exchange=Exchange.MCX, symbol="GOLD")
 
 with TTConnect("zerodha", config) as broker:
-    broker.place_order(PlaceOrderRequest(instrument=gold, ...))
+    broker.place_order(instrument=gold, side=Side.BUY, qty=1,
+                       order_type=OrderType.MARKET, product=ProductType.CNC)
     # Raises: UnsupportedFeatureError: Zerodha does not support MCX segment
     # (Raised before any HTTP call is made)
 ```
@@ -368,7 +382,8 @@ async def main():
     async with AsyncTTConnect("zerodha", config) as broker:
         profile = await broker.get_profile()
         funds = await broker.get_funds()
-        order_id = await broker.place_order(req)
+        order_id = await broker.place_order(instrument=..., side=Side.BUY, qty=1,
+                                             order_type=OrderType.MARKET, product=ProductType.CNC)
 
 asyncio.run(main())
 ```
@@ -378,5 +393,6 @@ asyncio.run(main())
 ## Next Steps
 
 - **Complete Examples:** [EXAMPLES.md](./EXAMPLES.md) — full working code
+- **Troubleshooting:** [TROUBLESHOOTING.md](./TROUBLESHOOTING.md) — common errors and fixes
 - **Architecture:** [ARCHITECTURE.md](./ARCHITECTURE.md) — how it works internally
 - **Contributor Guide:** [CONTRIBUTOR_GUIDE.md](./CONTRIBUTOR_GUIDE.md) — local setup and testing

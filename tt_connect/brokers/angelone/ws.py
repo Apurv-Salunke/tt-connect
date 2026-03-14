@@ -6,16 +6,18 @@ import asyncio
 import json
 import logging
 import struct
-from datetime import datetime, timezone
+from datetime import datetime
 from typing import Any
 
 import websockets
 import websockets.exceptions
 
+from tt_connect.core.timezone import IST
 from tt_connect.core.store.resolver import ResolvedInstrument
 from tt_connect.core.models.instruments import Instrument
 from tt_connect.core.models import Tick
-from tt_connect.core.adapter.ws import BrokerWebSocket, OnTick
+from tt_connect.core.models.enums import FeedState
+from tt_connect.core.adapter.ws import BrokerWebSocket
 
 logger = logging.getLogger(__name__)
 
@@ -73,90 +75,50 @@ class AngelOneWebSocket(BrokerWebSocket):
                        flag==0 → buy side, flag!=0 → sell side
     """
 
-    PING_INTERVAL       = 10    # seconds between heartbeat pings
+    PING_INTERVAL       = 10    # seconds between heartbeat text pings
+    STALE_THRESHOLD     = 30    # seconds without a tick before feed → STALE
     MAX_RECONNECT_DELAY = 60    # seconds
+    _BROKER_NAME        = "angelone"
 
     def __init__(self, auth: Any) -> None:
+        super().__init__()
         # auth: AngelOneAuth (typed loosely to avoid circular import)
         self._auth = auth
-        self._on_tick: OnTick | None = None
-        self._closed = False
-        self._ws: Any | None = None
-        self._task: asyncio.Task[None] | None = None
-        self._reconnect_delay = 2.0
 
         # token (str) → Instrument  — reverse map for incoming ticks
         self._token_map: dict[str, Instrument] = {}
         # token (str) → exchangeType (int) — needed to build subscribe messages
         self._token_exchange_type: dict[str, int] = {}
 
-    # ------------------------------------------------------------------ public
+    # ------------------------------------------------------------------ abstract hook implementations
 
-    async def subscribe(
-        self,
-        subscriptions: list[tuple[Instrument, ResolvedInstrument]],
-        on_tick: OnTick,
-    ) -> None:
-        """Track subscriptions and ensure websocket loop is running."""
-        self._on_tick = on_tick
-
+    async def _register_subscriptions(
+        self, subscriptions: list[tuple[Instrument, ResolvedInstrument]]
+    ) -> list[Any]:
+        """Store token→instrument mappings; return new token strings."""
         new_tokens: list[str] = []
         for instrument, resolved in subscriptions:
             self._token_map[resolved.token] = instrument
             self._token_exchange_type[resolved.token] = _EXCHANGE_TYPE.get(resolved.exchange, 1)
             new_tokens.append(resolved.token)
+        return new_tokens
 
-        if self._task is None or self._task.done():
-            self._closed = False
-            self._task = asyncio.create_task(self._run())
-        elif self._ws is not None:
-            # Already connected — subscribe new tokens immediately
-            await self._send_subscribe(self._ws, new_tokens)
+    def _tokens_for_instruments(self, instruments: list[Instrument]) -> list[Any]:
+        return [t for t, inst in self._token_map.items() if inst in instruments]
 
-    async def unsubscribe(self, instruments: list[Instrument]) -> None:
-        """Unsubscribe instruments and prune local token maps."""
-        tokens = [t for t, inst in self._token_map.items() if inst in instruments]
-        if not tokens:
-            return
-        if self._ws is not None:
-            await self._send_unsubscribe(self._ws, tokens)
+    def _remove_tokens(self, tokens: list[Any]) -> None:
         for t in tokens:
             self._token_map.pop(t, None)
             self._token_exchange_type.pop(t, None)
 
-    async def close(self) -> None:
-        """Stop reconnect loop and close active websocket task."""
-        self._closed = True
-        if self._task and not self._task.done():
-            self._task.cancel()
-            try:
-                await self._task
-            except asyncio.CancelledError:
-                pass
+    def _all_tracked_tokens(self) -> list[Any]:
+        return list(self._token_map.keys())
+
+    async def _maybe_ping(self, ws: Any) -> None:
+        """Send AngelOne application-level text ping."""
+        await ws.send("ping")
 
     # ------------------------------------------------------------ main loop
-
-    async def _run(self) -> None:
-        """Reconnect loop with exponential backoff."""
-        while not self._closed:
-            try:
-                await self._connect_and_run()
-                self._reconnect_delay = 2.0  # reset on clean exit
-            except asyncio.CancelledError:
-                break
-            except Exception as exc:
-                logger.warning(
-                    f"AngelOne WS error: {exc}",
-                    extra={"event": "ws.error", "broker": "angelone"},
-                )
-            if self._closed:
-                break
-            logger.info(
-                f"AngelOne WS reconnecting in {self._reconnect_delay:.0f}s …",
-                extra={"event": "ws.reconnect", "broker": "angelone", "delay_s": self._reconnect_delay},
-            )
-            await asyncio.sleep(self._reconnect_delay)
-            self._reconnect_delay = min(self._reconnect_delay * 2, self.MAX_RECONNECT_DELAY)
 
     async def _connect_and_run(self) -> None:
         """Open websocket, resubscribe tracked tokens, and dispatch ticks."""
@@ -170,46 +132,49 @@ class AngelOneWebSocket(BrokerWebSocket):
             "x-feed-token":   self._auth._session.feed_token or "",
         }
 
-        async with websockets.connect(_WS_URL, additional_headers=headers) as ws:
+        async with websockets.connect(
+            _WS_URL,
+            additional_headers=headers,
+            ping_interval=None,  # AngelOne uses text "ping" frames — disable library ping/pong
+        ) as ws:
             self._ws = ws
+            self._feed_state = FeedState.CONNECTED
             logger.info("AngelOne WS connected", extra={"event": "ws.connect", "broker": "angelone"})
 
             # On (re)connect, resubscribe to everything currently tracked
             if self._token_map:
-                await self._send_subscribe(ws, list(self._token_map.keys()))
+                await self._send_subscribe(ws, self._all_tracked_tokens())
 
-            ping_task: asyncio.Task[None] = asyncio.create_task(self._ping_loop(ws))
+            staleness_task: asyncio.Task[None] = asyncio.create_task(self._staleness_loop(ws))
             try:
                 async for message in ws:
                     if isinstance(message, bytes):
                         tick = self._parse_binary(message)
-                        if tick and self._on_tick:
-                            try:
-                                await self._on_tick(tick)
-                            except Exception:
-                                logger.exception(
-                                    "AngelOne WS on_tick callback failed",
-                                    extra={"event": "ws.tick_error", "broker": "angelone"},
-                                )
+                        if tick:
+                            was_stale = self._record_tick(tick.instrument)
+                            await self._maybe_fire_recovered(was_stale)
+                            if self._on_tick:
+                                try:
+                                    await self._on_tick(tick)
+                                except Exception:
+                                    logger.exception(
+                                        "AngelOne WS on_tick callback failed",
+                                        extra={"event": "ws.tick_error", "broker": "angelone"},
+                                    )
                     # text "pong" — ignore
             finally:
-                ping_task.cancel()
+                staleness_task.cancel()
+                try:
+                    await staleness_task
+                except asyncio.CancelledError:
+                    pass
                 self._ws = None
                 logger.info("AngelOne WS disconnected", extra={"event": "ws.disconnect", "broker": "angelone"})
-
-    async def _ping_loop(self, ws: Any) -> None:
-        """Send periodic ping text frames to keep the socket alive."""
-        while True:
-            await asyncio.sleep(self.PING_INTERVAL)
-            try:
-                await ws.send("ping")
-            except Exception:
-                break
 
     # ------------------------------------------------- subscribe / unsubscribe
 
     async def _send_subscribe(
-        self, ws: Any, tokens: list[str], mode: int = _MODE_SNAP_QUOTE
+        self, ws: Any, tokens: list[Any], mode: int = _MODE_SNAP_QUOTE
     ) -> None:
         token_list = self._build_token_list(tokens)
         if not token_list:
@@ -225,7 +190,7 @@ class AngelOneWebSocket(BrokerWebSocket):
         )
 
     async def _send_unsubscribe(
-        self, ws: Any, tokens: list[str], mode: int = _MODE_QUOTE
+        self, ws: Any, tokens: list[Any], mode: int = _MODE_QUOTE
     ) -> None:
         token_list = self._build_token_list(tokens)
         if not token_list:
@@ -240,7 +205,7 @@ class AngelOneWebSocket(BrokerWebSocket):
             extra={"event": "ws.unsubscribe", "broker": "angelone", "token_count": len(tokens)},
         )
 
-    def _build_token_list(self, tokens: list[str]) -> list[dict[str, Any]]:
+    def _build_token_list(self, tokens: list[Any]) -> list[dict[str, Any]]:
         """Group tokens by exchangeType for the AngelOne subscribe payload."""
         by_exchange: dict[int, list[str]] = {}
         for token in tokens:
@@ -269,7 +234,7 @@ class AngelOneWebSocket(BrokerWebSocket):
         ts_ms  = struct.unpack_from("<q", data, 35)[0]
         ltp    = struct.unpack_from("<q", data, 43)[0] / 100.0
         ts     = (
-            datetime.fromtimestamp(ts_ms / 1000, tz=timezone.utc)
+            datetime.fromtimestamp(ts_ms / 1000, tz=IST)
             if ts_ms > 0 else None
         )
 

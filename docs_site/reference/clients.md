@@ -14,8 +14,10 @@
 | Sync | `close` | none | `None` | `TTConnectError` |
 | Async | `init` | none | `None` | `AuthenticationError`, `ConfigurationError`, `TTConnectError` |
 | Async | `close` | none | `None` | `TTConnectError` |
-| Async | `subscribe` | `instruments`, `on_tick` | `None` | `ClientNotConnectedError`, `InstrumentNotFoundError`, `TTConnectError` |
+| Async | `subscribe` | `instruments`, `on_tick`, `on_stale=None`, `on_recovered=None` | `None` | `ClientNotConnectedError`, `InstrumentNotFoundError`, `TTConnectError` |
 | Async | `unsubscribe` | `instruments` | `None` | `ClientNotConnectedError`, `TTConnectError` |
+| Async | `feed_state` *(property)* | — | `FeedState` | — |
+| Async | `last_tick_at` | `instrument: Instrument` | `datetime \| None` | — |
 
 ## Portfolio / account methods
 

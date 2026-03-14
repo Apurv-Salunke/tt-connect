@@ -33,7 +33,6 @@ Run
 
 import asyncio
 import os
-from datetime import date
 from pathlib import Path
 
 
@@ -150,40 +149,42 @@ sensex = Index(exchange=Exchange.BSE, symbol="SENSEX")
 reliance = Equity(exchange=Exchange.NSE, symbol="RELIANCE")
 tcs      = Equity(exchange=Exchange.BSE, symbol="TCS")
 
-# Helper to get the actual nearest expiry from the DB instead of hardcoding
-def get_nearest_expiry(broker_client: TTConnect, symbol: str) -> date:
-    async def fetch():
-        query = '''
-            SELECT min(f.expiry) FROM futures f
-            JOIN instruments u ON f.underlying_id = u.id
-            WHERE u.symbol = ? AND f.expiry >= date('now', 'localtime')
-        '''
-        async with broker_client._async._instrument_manager.connection.execute(query, (symbol,)) as cur:
-            row = await cur.fetchone()
-            return date.fromisoformat(row[0]) if row and row[0] else date.today()
-    return broker_client._run(fetch())
+# Use the public instrument APIs instead of reaching into the DB directly.
+futures = broker.get_futures(nifty)
+option_expiries = broker.get_expiries(nifty)
+if not futures:
+    print("  [No NIFTY futures available in the instrument DB.]")
+    raise RuntimeError("Expected at least one NIFTY future in the refreshed instrument DB.")
+if not option_expiries:
+    print("  [No NIFTY option expiries available in the instrument DB.]")
+    raise RuntimeError("Expected at least one NIFTY option expiry in the refreshed instrument DB.")
 
-nearest_expiry = get_nearest_expiry(broker, "NIFTY")
-print(f"  [Using nearest NIFTY expiry: {nearest_expiry}]")
+nearest_future_expiry = futures[0].expiry
+nearest_option_expiry = option_expiries[0]
+print(f"  [Using nearest NIFTY future expiry: {nearest_future_expiry}]")
+print(f"  [Using nearest NIFTY option expiry: {nearest_option_expiry}]")
 
 # Future  
 nifty_fut = Future(
-    exchange=Exchange.NSE,
+    exchange=Exchange.NFO,
     symbol="NIFTY",
-    expiry=nearest_expiry,
+    expiry=nearest_future_expiry,
 )
 
 # Option
 nifty_ce = Option(
-    exchange=Exchange.NSE,
+    exchange=Exchange.NFO,
     symbol="NIFTY",
-    expiry=nearest_expiry,
+    expiry=nearest_option_expiry,
     strike=25000.0,
     option_type=OptionType.CE,
 )
 
 for inst in [nifty, sensex, reliance, tcs, nifty_fut, nifty_ce]:
-    token = broker._run(broker._async._resolve(inst))
+    # This reaches into private internals purely for illustration. Production
+    # code should rely on public methods like place_order(), which resolve
+    # canonical instruments automatically.
+    token = broker._run(broker._async._core._resolve(inst))
     print(f"  {inst.exchange}:{inst.symbol:<20} → {token}")
 
 print()
@@ -255,6 +256,8 @@ print()
 # 6. Order management (commented out — uncomment to execute)
 # ---------------------------------------------------------------------------
 
+from tt_connect.enums import Side, ProductType, OrderType  # noqa: E402, F401
+
 # Place a limit order
 # order_id = broker.place_order(
 #     instrument=Equity(exchange=Exchange.NSE, symbol="SBIN"),
@@ -267,7 +270,12 @@ print()
 # print(f"Placed order: {order_id}")
 
 # Modify it
-# broker.modify_order(order_id, price=801.00, order_type=OrderType.LIMIT, qty=1)
+# broker.modify_order(
+#     order_id=order_id,
+#     price=801.00,
+#     order_type=OrderType.LIMIT,
+#     qty=1,
+# )
 
 # Cancel a specific order
 # broker.cancel_order(order_id)

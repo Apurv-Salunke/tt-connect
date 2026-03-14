@@ -13,6 +13,7 @@
 | `OnStale` | `fail`, `warn` | Instrument cache staleness behavior |
 | `AuthMode` | `manual`, `auto` | Broker login mode |
 | `ClientState` | `created`, `connected`, `closed` | Client lifecycle state |
+| `FeedState` | `connecting`, `connected`, `reconnecting`, `stale`, `closed` | WebSocket feed health state |
 | `CandleInterval` | `1minute`, `3minute`, `5minute`, `10minute`, `15minute`, `30minute`, `60minute`, `day` | Historical candle interval |
 
 ## Related guides

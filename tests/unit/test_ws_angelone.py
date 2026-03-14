@@ -4,7 +4,7 @@ from __future__ import annotations
 
 import json
 import struct
-from datetime import timezone
+from tt_connect.core.timezone import IST
 from unittest.mock import MagicMock, patch
 
 import pytest
@@ -134,7 +134,7 @@ def test_ltp_timestamp_nonzero_parsed() -> None:
 
     assert tick is not None
     assert tick.timestamp is not None
-    assert tick.timestamp.tzinfo == timezone.utc
+    assert tick.timestamp.tzinfo == IST
 
 
 def test_packet_too_short_returns_none() -> None:
@@ -408,7 +408,7 @@ async def test_on_tick_exception_is_logged_and_stream_continues(
     caplog: pytest.LogCaptureFixture,
 ) -> None:
     import logging
-    from unittest.mock import AsyncMock
+    from unittest.mock import AsyncMock, MagicMock as MM
 
     auth = MagicMock()
     auth._session = MagicMock(feed_token="feedtok")
@@ -416,7 +416,7 @@ async def test_on_tick_exception_is_logged_and_stream_continues(
     auth._config = {"api_key": "key", "client_id": "cid"}
 
     ws = AngelOneWebSocket(auth=auth)
-    ws._ping_loop = AsyncMock(return_value=None)  # type: ignore[method-assign]
+    ws._staleness_loop = AsyncMock(return_value=None)  # type: ignore[method-assign]
 
     calls = 0
 
@@ -427,7 +427,8 @@ async def test_on_tick_exception_is_logged_and_stream_continues(
             raise RuntimeError("boom")
 
     ws._on_tick = on_tick
-    ws._parse_binary = lambda _m: object()  # type: ignore[method-assign]
+    mock_tick = MM()
+    ws._parse_binary = lambda _m: mock_tick  # type: ignore[method-assign]
 
     with patch("tt_connect.brokers.angelone.ws.websockets.connect", return_value=_FakeWs([b"a", b"b"])):
         with caplog.at_level(logging.ERROR, logger="tt_connect.brokers.angelone.ws"):

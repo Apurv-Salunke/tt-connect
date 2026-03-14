@@ -77,6 +77,16 @@ class ClientState(StrEnum):
     CLOSED    = "closed"
 
 
+class FeedState(StrEnum):
+    """Live state of a broker WebSocket feed."""
+
+    CONNECTING   = "connecting"    # initial / attempting first connect
+    CONNECTED    = "connected"     # socket open, ticks flowing normally
+    RECONNECTING = "reconnecting"  # socket dropped, backoff in progress
+    STALE        = "stale"         # connected but no tick within threshold
+    CLOSED       = "closed"        # deliberately shut down
+
+
 class CandleInterval(StrEnum):
     """Canonical OHLC candle intervals, broker-agnostic."""
 

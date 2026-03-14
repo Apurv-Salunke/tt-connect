@@ -33,43 +33,53 @@ Proxy layer that makes the library natively usable in both sync and async Python
 
 ```text
 tt_connect/
-├── __init__.py           # Public exports: TTConnect, AsyncTTConnect, PlaceOrderRequest, ModifyOrderRequest, PlaceGttRequest, ModifyGttRequest, Gtt, GttLeg
-├── client.py             # AsyncTTConnect (public facade) + _AsyncTTConnectCore (internal)
-├── lifecycle.py          # _ClientBase + LifecycleMixin (init, close, state, WebSocket)
-├── portfolio.py          # PortfolioMixin (get_profile, get_funds, holdings, positions, trades)
-├── orders.py             # OrdersMixin (place, modify, cancel, get orders, close positions)
-├── instruments_mixin.py  # InstrumentsMixin (get_futures, get_options, get_expiries, search)
-├── sync_client.py        # TTConnect — threaded sync wrapper over AsyncTTConnect
-├── enums.py              # Exchange, OrderType, ProductType, Side, OptionType, ClientState
-├── instruments.py        # Equity, Future, Option, Currency
-├── models.py             # Response models + PlaceOrderRequest, ModifyOrderRequest
-├── exceptions.py         # TTConnectError hierarchy + lifecycle errors
-├── capabilities.py       # Capabilities dataclass + internal checker
-├── instrument_manager/
-│   ├── manager.py        # fetch, store, refresh lifecycle
-│   ├── db.py             # SQLite interface
-│   └── resolver.py       # Instrument → broker token/symbol
-├── adapters/
-│   ├── base.py           # BrokerAdapter base + auto-registry + BrokerTransformer Protocol
-│   ├── zerodha/
-│   │   ├── adapter.py
-│   │   ├── auth.py
-│   │   ├── transformer.py  # request/response normalization
-│   │   ├── parser.py       # instrument master CSV parsing
-│   │   └── capabilities.py
-│   └── angelone/
-│       ├── adapter.py
-│       ├── auth.py
-│       ├── transformer.py
-│       ├── parser.py       # instrument master JSON parsing
-│       └── capabilities.py
-└── ws/
-    ├── client.py           # BrokerWebSocket abstract + OnTick type
-    ├── angelone.py         # AngelOne WebSocket (SmartAPI stream)
-    └── zerodha.py          # Zerodha WebSocket (KiteTicker binary protocol)
+├── __init__.py                    # Public exports: TTConnect, AsyncTTConnect, models, enums, exceptions
+├── core/
+│   ├── client/
+│   │   ├── _async.py              # AsyncTTConnect (public facade) + _AsyncTTConnectCore (internal)
+│   │   ├── _sync.py               # TTConnect — threaded sync wrapper over AsyncTTConnect
+│   │   ├── _base.py               # _ClientBase (shared state: adapter, resolver, ws, state)
+│   │   ├── _lifecycle.py          # LifecycleMixin (init, close, state machine, WebSocket)
+│   │   ├── _orders.py             # OrdersMixin (place, modify, cancel, GTT, close positions)
+│   │   ├── _portfolio.py          # PortfolioMixin (profile, funds, holdings, positions, trades, quotes, historical)
+│   │   └── _instruments.py        # InstrumentsMixin (futures, options, expiries, search)
+│   ├── models/
+│   │   ├── enums.py               # Exchange, OrderType, ProductType, Side, OptionType, CandleInterval, ClientState
+│   │   ├── instruments.py         # Equity, Future, Option, Index, Currency, Commodity
+│   │   ├── responses.py           # Order, Position, Holding, Fund, Profile, Tick, Candle, Trade, Gtt, Margin
+│   │   ├── requests.py            # PlaceOrderRequest, ModifyOrderRequest, PlaceGttRequest, ModifyGttRequest, GttLeg
+│   │   └── config.py              # BrokerConfig base class
+│   ├── adapter/
+│   │   ├── base.py                # BrokerAdapter base + auto-registry via __init_subclass__
+│   │   ├── transformer.py         # BrokerTransformer Protocol (contract all transformers implement)
+│   │   ├── ws.py                  # BrokerWebSocket abstract + OnTick type
+│   │   └── capabilities.py        # Capabilities dataclass + verify()
+│   ├── store/
+│   │   ├── manager.py             # InstrumentManager: fetch, store, refresh lifecycle
+│   │   ├── resolver.py            # Instrument → broker token/symbol (lru_cache)
+│   │   └── schema.py              # SQLite schema initialization
+│   ├── exceptions.py              # TTConnectError hierarchy + lifecycle errors
+│   └── logging.py                 # setup_logging() + JSON/text formatter
+└── brokers/
+    ├── zerodha/
+    │   ├── adapter.py             # Kite Connect v3 REST endpoints
+    │   ├── auth.py                # OAuth daily login + token handling
+    │   ├── transformer.py         # Request/response normalization (Zerodha ↔ canonical)
+    │   ├── parser.py              # Instrument master CSV parsing
+    │   ├── capabilities.py        # ZERODHA_CAPABILITIES
+    │   ├── config.py              # ZerodhaConfig
+    │   └── ws.py                  # KiteTicker WebSocket (binary protocol, FULL mode)
+    └── angelone/
+        ├── adapter.py             # SmartAPI REST endpoints
+        ├── auth.py                # TOTP login flow + session caching
+        ├── transformer.py         # Request/response normalization (AngelOne ↔ canonical)
+        ├── parser.py              # Instrument master JSON parsing
+        ├── capabilities.py        # ANGELONE_CAPABILITIES
+        ├── config.py              # AngelOneConfig
+        └── ws.py                  # SmartStream WebSocket (SNAP_QUOTE mode)
 ```
 
-**To add a new broker: create a folder under `adapters/`, implement 5 files. Touch nothing else.**
+**To add a new broker: create a folder under `brokers/`, implement 7 files. Touch nothing else.**
 
 ---
 
@@ -174,7 +184,7 @@ Request models are validated at construction — bad fields surface before any n
 No registry file to maintain. A broker registers itself just by existing.
 
 ```python
-# adapters/base.py
+# core/adapter/base.py
 class BrokerAdapter:
     _registry: ClassVar[dict[str, type[BrokerAdapter]]] = {}
 
@@ -183,11 +193,11 @@ class BrokerAdapter:
         if broker_id:
             BrokerAdapter._registry[broker_id] = cls
 
-# adapters/zerodha/adapter.py
+# brokers/zerodha/adapter.py
 class ZerodhaAdapter(BrokerAdapter, broker_id="zerodha"):
     ...
 
-# lifecycle.py — broker resolved from registry at runtime
+# core/client/_lifecycle.py — broker resolved from registry at runtime
 class LifecycleMixin:
     def __init__(self, broker: str, config: dict):
         self._adapter = BrokerAdapter._registry[broker](config)
@@ -217,7 +227,7 @@ class Capabilities:
 All request building and response parsing is isolated inside the broker adapter. Nothing else touches raw broker data.
 
 ```python
-# adapters/zerodha/transformer.py
+# brokers/zerodha/transformer.py
 class ZerodhaTransformer:
 
     @staticmethod
@@ -256,7 +266,7 @@ class ZerodhaTransformer:
 Validation, serialization, and IDE support for free. Response models are frozen; request models are mutable.
 
 ```python
-# models.py
+# core/models/responses.py
 class Order(BaseModel):
     model_config = ConfigDict(frozen=True)
     id: str
@@ -267,6 +277,7 @@ class Order(BaseModel):
     filled_qty: int
     avg_price: float | None = None
 
+# core/models/requests.py
 class PlaceOrderRequest(BaseModel):
     instrument: Instrument
     side: Side
@@ -282,7 +293,7 @@ class PlaceOrderRequest(BaseModel):
 Core logic is async. `TTConnect` wraps it with a dedicated background thread running an event loop — zero code duplication.
 
 ```python
-# sync_client.py
+# core/client/_sync.py
 class TTConnect:
     def __init__(self, broker: str, config: dict):
         self._loop = asyncio.new_event_loop()
@@ -294,8 +305,11 @@ class TTConnect:
     def _run(self, coro) -> T:
         return asyncio.run_coroutine_threadsafe(coro, self._loop).result()
 
-    def place_order(self, req: PlaceOrderRequest) -> str:
-        return self._run(self._async.place_order(req))
+    def place_order(self, instrument, side, qty, order_type, product, **kw) -> str:
+        return self._run(self._async.place_order(
+            instrument=instrument, side=side, qty=qty,
+            order_type=order_type, product=product, **kw,
+        ))
 ```
 
 ### Instrument Resolution with `lru_cache`
@@ -303,7 +317,7 @@ class TTConnect:
 Symbol resolution is a SQLite lookup. Cached after first call.
 
 ```python
-# instrument_manager/resolver.py
+# core/store/resolver.py
 class InstrumentResolver:
     @lru_cache(maxsize=10_000)
     def resolve(self, instrument: Instrument, broker_id: str) -> ResolvedInstrument:
@@ -457,13 +471,15 @@ No warnings. No fallbacks. No user-side capability checks.
 
 ## Adding a New Broker
 
-Create a folder under `adapters/`. Implement 5 files. Touch nothing else.
+Create a folder under `brokers/`. Implement 7 files. Touch nothing else.
 
 ```
-adapters/newbroker/
+brokers/newbroker/
 ├── adapter.py       # subclass BrokerAdapter with broker_id="newbroker"
 ├── auth.py          # login, token refresh, session management
 ├── transformer.py   # to_order_params(), to_modify_params(), to_order(), to_tick(), etc.
 ├── parser.py        # instrument master file parsing (CSV, JSON, etc.)
-└── capabilities.py  # NEWBROKER_CAPABILITIES = Capabilities(...)
+├── capabilities.py  # NEWBROKER_CAPABILITIES = Capabilities(...)
+├── config.py        # NewBrokerConfig dataclass
+└── ws.py            # WebSocket implementation
 ```
