@@ -1,5 +1,19 @@
 # Changelog
 
+## 0.8.0 - 2026-03-18
+
+### Added
+
+- **`Order.instrument` now populated** — `get_orders()` and `get_order()` previously always
+  returned `Order.instrument = None`. Both methods now perform a reverse token lookup against
+  the local SQLite instrument store and return the canonical `Instrument` (Equity, Future,
+  Option, or Index). Returns `None` only for delisted instruments not present in the local
+  cache.
+- `InstrumentResolver.reverse_resolve(token)` — new method with in-memory caching to map
+  broker tokens back to canonical instruments.
+- `BrokerTransformer.token_from_order(raw)` — new protocol method; Zerodha extracts
+  `instrument_token`, AngelOne extracts `symboltoken`.
+
 ## 0.7.0 - 2026-03-14
 
 - Bump: **minor**

@@ -79,6 +79,35 @@ ANGELONE_ACCESS_TOKEN=your_jwt_token
 
 ---
 
+## AngelOne Instrument Store Example
+
+**File:** `examples/angelone_store.py`
+
+**What it covers:**
+- Local `InstrumentStore` usage without placing trades
+- Derivative-enabled underlyings discovery
+- Instrument metadata (`lot_size`, `tick_size`, `segment`)
+- Expiry lookup
+- Option chain browsing
+- Raw SQL escape hatch
+
+**Run it:**
+```bash
+cd connect
+python examples/angelone_store.py
+```
+
+**When to use it:**
+- You want to explore the local instrument DB
+- You need option-chain discovery without creating a trading client
+- You want canonical instrument metadata for strategy tooling
+
+**Design note:**
+`InstrumentStore` is a read-only DB interface. The example refreshes the local
+instrument cache through `TTConnect` first, then opens the store for queries.
+
+---
+
 ## Both Examples Include
 
 - ✅ Full error handling
