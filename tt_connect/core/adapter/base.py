@@ -6,6 +6,8 @@ import asyncio
 import logging
 import time
 from abc import abstractmethod
+from datetime import datetime, timezone
+from email.utils import parsedate_to_datetime
 from typing import Any, ClassVar
 from urllib.parse import urlparse
 
@@ -33,13 +35,24 @@ _RETRY_BACKOFF = 1.0  # seconds; doubled on each attempt
 
 
 def _parse_retry_after(response: httpx.Response) -> float | None:
-    """Extract ``Retry-After`` header value as seconds, or *None* if absent/invalid."""
+    """Extract ``Retry-After`` header value as seconds, or *None* if absent/invalid.
+
+    Supports both numeric delay-seconds and HTTP-date formats per RFC 7231 §7.1.3.
+    """
     value = response.headers.get("retry-after")
     if value is None:
         return None
     try:
         return max(float(value), 0.0)
     except (ValueError, TypeError):
+        pass
+    try:
+        retry_at = parsedate_to_datetime(value)
+        if retry_at.tzinfo is None:
+            retry_at = retry_at.replace(tzinfo=timezone.utc)
+        delta = (retry_at - datetime.now(timezone.utc)).total_seconds()
+        return max(float(delta), 0.0)
+    except (TypeError, ValueError, IndexError, OverflowError):
         return None
 
 
@@ -211,6 +224,28 @@ class BrokerAdapter:
                 await asyncio.sleep(_RETRY_BACKOFF * (2 ** (attempt - 1)))
                 continue
 
+            # HTTP 429 — check before JSON parsing so non-JSON 429s (CDN/proxy) still retry
+            if response.status_code == 429:
+                retry_after = _parse_retry_after(response)
+                delay = retry_after if retry_after is not None else _RETRY_BACKOFF * (2 ** (attempt - 1))
+                last_exc = RateLimitError(
+                    f"Rate limited on {url_path}", retry_after=delay,
+                )
+                logger.warning(
+                    f"Rate limited ({attempt}/{_MAX_RETRIES}): {method} {url_path}, retrying in {delay:.1f}s",
+                    extra={
+                        "event": "request.rate_limited",
+                        "broker": self._broker_id,
+                        "method": method,
+                        "url": url_path,
+                        "attempt": attempt,
+                        "max_retries": _MAX_RETRIES,
+                        "retry_after": delay,
+                    },
+                )
+                await asyncio.sleep(delay)
+                continue
+
             try:
                 raw = response.json()
             except Exception:
@@ -246,28 +281,6 @@ class BrokerAdapter:
                     },
                 )
                 await asyncio.sleep(_RETRY_BACKOFF * (2 ** (attempt - 1)))
-                continue
-
-            # HTTP 429 — rate-limited, retry with Retry-After or backoff
-            if response.status_code == 429:
-                retry_after = _parse_retry_after(response)
-                delay = retry_after if retry_after is not None else _RETRY_BACKOFF * (2 ** (attempt - 1))
-                last_exc = RateLimitError(
-                    f"Rate limited on {url_path}", retry_after=delay,
-                )
-                logger.warning(
-                    f"Rate limited ({attempt}/{_MAX_RETRIES}): {method} {url_path}, retrying in {delay:.1f}s",
-                    extra={
-                        "event": "request.rate_limited",
-                        "broker": self._broker_id,
-                        "method": method,
-                        "url": url_path,
-                        "attempt": attempt,
-                        "max_retries": _MAX_RETRIES,
-                        "retry_after": delay,
-                    },
-                )
-                await asyncio.sleep(delay)
                 continue
 
             # 4xx or broker-level error
