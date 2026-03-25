@@ -26,7 +26,7 @@ You write one trading flow, then switch brokers by changing client config.
 | WebSocket streaming, long-running services | `AsyncTTConnect` (async) | Required for `subscribe()` and non-blocking I/O |
 | FastAPI, Django async views | `AsyncTTConnect` (async) | Fits naturally into async frameworks |
 
-Both clients expose the same methods and return the same models. Start with sync — switch to async only when you need streaming or are in an async context.
+Both clients expose the same core trading and account APIs, with realtime subscription APIs (`subscribe`/`unsubscribe`) available on the async client only. Start with sync — switch to async only when you need streaming or are in an async context.
 
 ## First working script (sync)
 ```python
