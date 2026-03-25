@@ -2,6 +2,7 @@
 
 ## [Unreleased]
 
+## [0.9.0] - 2026-03-25
 ### Added
 
 - **Rate-limit handling** — `_request()` now retries on HTTP 429 (with `Retry-After` support)
