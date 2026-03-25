@@ -6,6 +6,8 @@ import asyncio
 import logging
 import time
 from abc import abstractmethod
+from datetime import datetime, timezone
+from email.utils import parsedate_to_datetime
 from typing import Any, ClassVar
 from urllib.parse import urlparse
 
@@ -14,7 +16,7 @@ import httpx
 from tt_connect.core.adapter.capabilities import Capabilities
 from tt_connect.core.adapter.transformer import BrokerTransformer, JsonDict
 from tt_connect.core.adapter.ws import BrokerWebSocket
-from tt_connect.core.exceptions import TTConnectError, UnsupportedFeatureError
+from tt_connect.core.exceptions import RateLimitError, TTConnectError, UnsupportedFeatureError
 
 logger = logging.getLogger(__name__)
 
@@ -30,6 +32,28 @@ def _url_path(url: str) -> str:
 
 _MAX_RETRIES = 3
 _RETRY_BACKOFF = 1.0  # seconds; doubled on each attempt
+
+
+def _parse_retry_after(response: httpx.Response) -> float | None:
+    """Extract ``Retry-After`` header value as seconds, or *None* if absent/invalid.
+
+    Supports both numeric delay-seconds and HTTP-date formats per RFC 7231 §7.1.3.
+    """
+    value = response.headers.get("retry-after")
+    if value is None:
+        return None
+    try:
+        return max(float(value), 0.0)
+    except (ValueError, TypeError):
+        pass
+    try:
+        retry_at = parsedate_to_datetime(value)
+        if retry_at.tzinfo is None:
+            retry_at = retry_at.replace(tzinfo=timezone.utc)
+        delta = (retry_at - datetime.now(timezone.utc)).total_seconds()
+        return max(float(delta), 0.0)
+    except (TypeError, ValueError, IndexError, OverflowError):
+        return None
 
 
 class BrokerAdapter:
@@ -162,7 +186,9 @@ class BrokerAdapter:
         Retry policy:
         - Retries on `httpx.TimeoutException`
         - Retries on HTTP 5xx responses
-        - Does not retry broker-declared/business errors (`_is_error`)
+        - Retries on HTTP 429 (respects ``Retry-After`` header when present)
+        - Retries on broker-level errors marked ``retryable`` (e.g. ``RateLimitError``)
+        - Does not retry other broker-declared/business errors (`_is_error`)
         """
         last_exc: Exception | None = None
         url_path = _url_path(url)
@@ -196,6 +222,28 @@ class BrokerAdapter:
                     },
                 )
                 await asyncio.sleep(_RETRY_BACKOFF * (2 ** (attempt - 1)))
+                continue
+
+            # HTTP 429 — check before JSON parsing so non-JSON 429s (CDN/proxy) still retry
+            if response.status_code == 429:
+                retry_after = _parse_retry_after(response)
+                delay = retry_after if retry_after is not None else _RETRY_BACKOFF * (2 ** (attempt - 1))
+                last_exc = RateLimitError(
+                    f"Rate limited on {url_path}", retry_after=delay,
+                )
+                logger.warning(
+                    f"Rate limited ({attempt}/{_MAX_RETRIES}): {method} {url_path}, retrying in {delay:.1f}s",
+                    extra={
+                        "event": "request.rate_limited",
+                        "broker": self._broker_id,
+                        "method": method,
+                        "url": url_path,
+                        "attempt": attempt,
+                        "max_retries": _MAX_RETRIES,
+                        "retry_after": delay,
+                    },
+                )
+                await asyncio.sleep(delay)
                 continue
 
             try:
@@ -235,9 +283,28 @@ class BrokerAdapter:
                 await asyncio.sleep(_RETRY_BACKOFF * (2 ** (attempt - 1)))
                 continue
 
-            # 4xx or broker-level error — do not retry
+            # 4xx or broker-level error
             if self._is_error(raw, response.status_code):
-                raise self.transformer.parse_error(raw)
+                broker_exc = self.transformer.parse_error(raw)
+                # Retryable broker errors (e.g. in-body rate limits) — retry
+                if broker_exc.retryable and attempt < _MAX_RETRIES:
+                    last_exc = broker_exc
+                    delay = _RETRY_BACKOFF * (2 ** (attempt - 1))
+                    logger.warning(
+                        f"Retryable broker error ({attempt}/{_MAX_RETRIES}): {method} {url_path} — {broker_exc}",
+                        extra={
+                            "event": "request.retryable_error",
+                            "broker": self._broker_id,
+                            "method": method,
+                            "url": url_path,
+                            "attempt": attempt,
+                            "max_retries": _MAX_RETRIES,
+                            "error": str(broker_exc),
+                        },
+                    )
+                    await asyncio.sleep(delay)
+                    continue
+                raise broker_exc
 
             latency_ms = int((time.monotonic() - t0) * 1000)
             logger.debug(
