@@ -1,5 +1,11 @@
 # Changelog
 
+## 0.8.4 - 2026-03-25
+
+- Bump: **patch**
+- Source PR: #54 docs: clarify cache_session vs auth_mode=auto
+
+
 ## 0.8.3 - 2026-03-25
 
 - Bump: **patch**
