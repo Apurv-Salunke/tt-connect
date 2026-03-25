@@ -62,8 +62,10 @@ Use PyPI Trusted Publisher (OIDC) for GitHub Actions.
 
 - Avoid long-lived PyPI tokens in repository secrets.
 - Restrict release workflow permissions to minimum required scope.
-- `RELEASE_BYPASS_TOKEN` (fine-grained PAT, `contents:write`) is used by the release
-  workflow to push the version bump commit and tag past branch protection.
+- `RELEASE_BYPASS_TOKEN` (fine-grained PAT, `contents:write`) must be stored as a
+  secret on the protected `release` environment (restricted to `main` with
+  required reviewers). The release workflow uses it to push the version bump
+  commit and tag past branch protection.
 
 ## Required CI Workflows
 
