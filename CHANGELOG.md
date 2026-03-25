@@ -13,6 +13,8 @@
 
 - **AngelOne `get_order()`** — no longer raises `UnsupportedFeatureError`. Fetches full order
   book and filters by `order_id`; raises `OrderNotFoundError` if not found.
+- **AngelOne local IP timeout** — `_local_ip()` socket now has a 5s timeout to prevent hangs
+  on misconfigured networks.
 
 ## [0.8.4] - 2026-03-25
 
