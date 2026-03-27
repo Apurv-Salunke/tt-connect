@@ -2,6 +2,7 @@
 
 ## [Unreleased]
 
+## [0.9.1] - 2026-03-27
 ### Fixed
 - **AngelOne duplicate instruments** — symbols appearing as both index (`AMXIDX`) and plain
   equity in AngelOne's master (e.g. NIFTY, BANKNIFTY) are now deduplicated; the index row
