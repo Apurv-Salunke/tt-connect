@@ -5,10 +5,9 @@ This example streams ticks and writes simple CSV rows.
 ```python
 import asyncio
 from pathlib import Path
-from tt_connect import AsyncTTConnect
+from tt_connect import AsyncTTConnect, Tick
 from tt_connect.instruments import Equity
 from tt_connect.enums import Exchange
-from tt_connect import Tick
 
 OUT = Path("ticks.csv")
 
@@ -24,7 +23,7 @@ async def main() -> None:
         Equity(exchange=Exchange.NSE, symbol="SBIN"),
     ]
 
-    async with AsyncTTConnect("zerodha", config) as broker:
+    async with AsyncTTConnect(broker_id, config) as broker:
         await broker.subscribe(watch, on_tick)
         await asyncio.sleep(30)
         await broker.unsubscribe(watch)
@@ -33,13 +32,9 @@ asyncio.run(main())
 ```
 
 ## Practical note
+
 For high tick rates, use an in-memory queue + background writer instead of writing per tick.
 
-## What's next?
-- [Recover from reconnect](recover-from-reconnect.md) — handle feed interruptions gracefully
-- [Realtime (WebSocket)](../realtime-websocket.md) — full feed health and staleness guide
+## What's next
 
-## Related reference
-- [Client methods (`subscribe`, `unsubscribe`)](../reference/clients.md)
-- [Models (`Tick`)](../reference/models.md)
-- [Broker operation notes](../reference/operation-notes.md)
+- [WebSocket](../websocket.md) — full feed health and reconnect guide

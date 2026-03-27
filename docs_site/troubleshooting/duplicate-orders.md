@@ -1,16 +1,19 @@
 # Duplicate Order Protection
 
 ## Common symptoms
-- same intent appears multiple times in order book
-- retries after timeout create accidental duplicates
+
+- Same intent appears multiple times in order book
+- Retries after timeout create accidental duplicates
 
 ## Safety checklist
+
 1. Always store `order_id` from each placement.
 2. Pass a `tag` kwarg for request correlation.
 3. Before retrying, check recent orders for matching intent.
 4. Retry only on clearly transient errors.
 
 ## Basic pattern
+
 ```python
 order_id = broker.place_order(
     instrument=instrument,
@@ -25,11 +28,12 @@ order_id = broker.place_order(
 ```
 
 ## Operational controls
-- keep short-term in-memory dedupe key
-- alert when same symbol+side+qty repeats quickly
-- use manual approval for replays in production
+
+- Keep a short-term in-memory dedupe key
+- Alert when same symbol + side + qty repeats quickly
+- Use manual approval for replays in production
 
 ## Related
-- [Errors & Retries](../errors-and-retries.md)
+
+- [Error Handling](../error-handling.md)
 - [Orders](../orders.md)
-- [Models (`Order`)](../reference/models.md)

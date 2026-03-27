@@ -1,18 +1,14 @@
 # Instruments
 
-## Supported instrument types
-- Stock (equity)
-- Future
-- Option
-- Index (mainly for market data and underlying reference)
+## Supported types
 
-## Important fields
-- exchange
-- symbol
-- expiry (for futures/options)
-- strike + option type CE/PE (for options)
+- **Equity** — cash market stock
+- **Future** — derivative keyed by expiry
+- **Option** — derivative keyed by expiry + strike + CE/PE
+- **Index** — for market data and underlying reference (not tradeable for orders)
 
 ## Create instrument objects
+
 ```python
 from datetime import date
 from tt_connect.instruments import Equity, Future, Option, Index
@@ -37,47 +33,75 @@ nifty_ce = Option(
 ```
 
 ## Search instruments
-```python
-from tt_connect import TTConnect
 
-config = {"api_key": "...", "access_token": "..."}
+=== "Sync"
 
-with TTConnect("zerodha", config) as broker:
-    results = broker.search_instruments("RELIANCE", exchange="NSE")
-    for i in results:
-        print(i.exchange, i.symbol)
-```
+    ```python
+    from tt_connect import TTConnect
 
-## Discover futures/options/expiries
-```python
-from tt_connect import TTConnect
-from tt_connect.instruments import Equity
-from tt_connect.enums import Exchange
+    config = {"api_key": "...", "access_token": "..."}
 
-config = {"api_key": "...", "access_token": "..."}
-underlying = Equity(exchange=Exchange.NSE, symbol="SBIN")
+    with TTConnect(broker_id, config) as broker:
+        results = broker.search_instruments("RELIANCE", exchange="NSE")
+        for i in results:
+            print(i.exchange, i.symbol)
+    ```
 
-with TTConnect("zerodha", config) as broker:
-    expiries = broker.get_expiries(underlying)
-    print("Expiries:", expiries)
+=== "Async"
 
-    futures = broker.get_futures(underlying)
-    print("Futures count:", len(futures))
+    ```python
+    from tt_connect import AsyncTTConnect
 
-    if expiries:
-        chain = broker.get_options(underlying, expiry=expiries[0])
-        print("Options for first expiry:", len(chain))
-```
+    async with AsyncTTConnect(broker_id, config) as broker:
+        results = await broker.search_instruments("RELIANCE", exchange="NSE")
+        for i in results:
+            print(i.exchange, i.symbol)
+    ```
 
-## Instrument matching
-You pass a canonical instrument. The package maps it to broker token/symbol before API calls.
+## Discover futures, options, and expiries
 
-## User tips
-- always use correct exchange + symbol
-- use helper APIs to discover futures/options/expiries
-- treat index as non-tradable for order placement
+=== "Sync"
 
-## See also
-- [Client methods (`get_futures`, `get_options`, `get_expiries`, `search_instruments`)](reference/clients.md)
-- [Models (Instrument, Equity, Future, Option, Index)](reference/models.md)
-- [Enums (`Exchange`, `OptionType`)](reference/enums.md)
+    ```python
+    from tt_connect import TTConnect
+    from tt_connect.instruments import Equity
+    from tt_connect.enums import Exchange
+
+    config = {"api_key": "...", "access_token": "..."}
+    underlying = Equity(exchange=Exchange.NSE, symbol="SBIN")
+
+    with TTConnect(broker_id, config) as broker:
+        expiries = broker.get_expiries(underlying)
+        print("Expiries:", expiries)
+
+        futures = broker.get_futures(underlying)
+        print("Futures count:", len(futures))
+
+        if expiries:
+            chain = broker.get_options(underlying, expiry=expiries[0])
+            print("Options for first expiry:", len(chain))
+    ```
+
+=== "Async"
+
+    ```python
+    from tt_connect import AsyncTTConnect
+    from tt_connect.instruments import Equity
+    from tt_connect.enums import Exchange
+
+    config = {"api_key": "...", "access_token": "..."}
+    underlying = Equity(exchange=Exchange.NSE, symbol="SBIN")
+
+    async with AsyncTTConnect(broker_id, config) as broker:
+        expiries = await broker.get_expiries(underlying)
+        futures = await broker.get_futures(underlying)
+        if expiries:
+            chain = await broker.get_options(underlying, expiry=expiries[0])
+    ```
+
+## Tips
+
+- Always use the correct exchange + symbol combination
+- Use helper APIs to discover futures/options/expiries rather than guessing
+- Index instruments cannot be used for order placement
+- The package maps canonical instruments to broker-specific tokens automatically
