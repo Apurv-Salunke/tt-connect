@@ -20,11 +20,12 @@
 | `ClientClosedError` | Method called after client closed | No |
 
 ## Handling pattern
+
 - Catch specific errors first (`InsufficientFundsError`, `RateLimitError`, `AuthenticationError`).
 - Use `TTConnectError` as final fallback.
-- Retry only when it is clearly transient (for example `RateLimitError`).
+- Retry only when clearly transient (e.g. `RateLimitError`).
 
-## Related guides
-- [Errors & Retries](../errors-and-retries.md)
-- [Login & Session](../login-and-session.md)
-- [Safety & Good Practices](../safety-and-good-practices.md)
+## Related
+
+- [Error Handling](../error-handling.md)
+- [Authentication](../authentication.md)

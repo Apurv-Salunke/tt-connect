@@ -1,67 +1,108 @@
 # Market Data
 
-!!! warning "Broker support"
-    `get_quotes()` is only available for Zerodha. AngelOne does not expose a REST quotes endpoint — use WebSocket streaming (`subscribe`) instead. `get_historical()` works on both brokers.
-
 ## Data types
-- Quotes: snapshot from REST
-- Ticks: live updates from WebSocket
-- Candles: historical OHLC bars
+
+| Type | Source | Use case |
+|------|--------|----------|
+| **Quotes** | REST snapshot | Current price check |
+| **Ticks** | WebSocket stream | Live monitoring |
+| **Candles** | Historical API | Backtesting, charting |
+
+??? note "Broker-specific"
+    REST quotes (`get_quotes`) may not be available on all brokers. Use WebSocket streaming for guaranteed live data across brokers. Historical candles (`get_historical`) work on all brokers.
 
 ## Get quotes
-```python
-from tt_connect import TTConnect
-from tt_connect.instruments import Equity
-from tt_connect.enums import Exchange
 
-config = {"api_key": "...", "access_token": "..."}
+=== "Sync"
 
-with TTConnect("zerodha", config) as broker:
-    instruments = [
-        Equity(exchange=Exchange.NSE, symbol="RELIANCE"),
-        Equity(exchange=Exchange.NSE, symbol="SBIN"),
-    ]
-    quotes = broker.get_quotes(instruments)
-    for q in quotes:
-        print(q.instrument.symbol, q.ltp, q.volume)
-```
+    ```python
+    from tt_connect import TTConnect
+    from tt_connect.instruments import Equity
+    from tt_connect.enums import Exchange
+
+    config = {"api_key": "...", "access_token": "..."}
+
+    with TTConnect(broker_id, config) as broker:
+        instruments = [
+            Equity(exchange=Exchange.NSE, symbol="RELIANCE"),
+            Equity(exchange=Exchange.NSE, symbol="SBIN"),
+        ]
+        quotes = broker.get_quotes(instruments)
+        for q in quotes:
+            print(q.instrument.symbol, q.ltp, q.volume)
+    ```
+
+=== "Async"
+
+    ```python
+    from tt_connect import AsyncTTConnect
+    from tt_connect.instruments import Equity
+    from tt_connect.enums import Exchange
+
+    config = {"api_key": "...", "access_token": "..."}
+
+    async with AsyncTTConnect(broker_id, config) as broker:
+        instruments = [
+            Equity(exchange=Exchange.NSE, symbol="RELIANCE"),
+            Equity(exchange=Exchange.NSE, symbol="SBIN"),
+        ]
+        quotes = await broker.get_quotes(instruments)
+        for q in quotes:
+            print(q.instrument.symbol, q.ltp, q.volume)
+    ```
 
 ## Get historical candles
-```python
-from datetime import datetime, timedelta
-from tt_connect.enums import CandleInterval
 
-end = datetime.now()
-start = end - timedelta(days=5)
+=== "Sync"
 
-candles = broker.get_historical(
-    instrument=Equity(exchange=Exchange.NSE, symbol="RELIANCE"),
-    interval=CandleInterval.MINUTE_5,
-    from_date=start,
-    to_date=end,
-)
+    ```python
+    from datetime import datetime, timedelta
+    from tt_connect.enums import CandleInterval
 
-for c in candles[:3]:
-    print(c.timestamp, c.open, c.high, c.low, c.close, c.volume)
-```
+    end = datetime.now()
+    start = end - timedelta(days=5)
 
-## Tick fields you may see
-- ltp
-- volume
-- oi
-- bid/ask
-- timestamp
+    candles = broker.get_historical(
+        instrument=Equity(exchange=Exchange.NSE, symbol="RELIANCE"),
+        interval=CandleInterval.MINUTE_5,
+        from_date=start,
+        to_date=end,
+    )
 
-## Reality checks
-- some fields may be missing by broker or segment
-- timestamps may differ from your local clock
+    for c in candles[:3]:
+        print(c.timestamp, c.open, c.high, c.low, c.close, c.volume)
+    ```
 
-## What's next?
-- [Realtime (WebSocket)](realtime-websocket.md) — stream live ticks with feed health callbacks
-- [Recipe: Stream and store live ticks](recipes/stream-and-store-live-ticks.md) — save ticks to CSV
+=== "Async"
 
-## See also
-- [Client methods (`get_quotes`, `get_historical`, `subscribe`)](reference/clients.md)
-- [Models (`Tick`, `Candle`)](reference/models.md)
-- [Enums (`CandleInterval`)](reference/enums.md)
-- [Broker operation notes](reference/operation-notes.md)
+    ```python
+    from datetime import datetime, timedelta
+    from tt_connect.enums import CandleInterval
+
+    end = datetime.now()
+    start = end - timedelta(days=5)
+
+    candles = await broker.get_historical(
+        instrument=Equity(exchange=Exchange.NSE, symbol="RELIANCE"),
+        interval=CandleInterval.MINUTE_5,
+        from_date=start,
+        to_date=end,
+    )
+    ```
+
+## Tick fields
+
+| Field | Always present | Notes |
+|-------|---------------|-------|
+| `ltp` | Yes | Last traded price |
+| `volume` | Optional | May be `None` |
+| `oi` | Optional | Open interest |
+| `bid` / `ask` | Optional | Best bid/ask |
+| `timestamp` | Optional | Broker-provided time |
+
+Field availability varies by broker and segment. Write tick callbacks that handle `None` values.
+
+## What's next
+
+- [WebSocket](websocket.md) — stream live ticks with feed health callbacks
+- [Recipe: Stream live ticks](recipes/stream-and-store-live-ticks.md) — save ticks to CSV

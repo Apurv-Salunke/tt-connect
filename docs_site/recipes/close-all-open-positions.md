@@ -1,28 +1,40 @@
 # Recipe: Close All Open Positions
 
-This places offsetting market actions for open positions.
+This places offsetting market orders for all open positions.
 
-```python
-from tt_connect import TTConnect
+=== "Sync"
 
-config = {"api_key": "...", "access_token": "..."}
+    ```python
+    from tt_connect import TTConnect
 
-with TTConnect("zerodha", config) as broker:
-    placed_order_ids, failed_symbols = broker.close_all_positions()
-    print("Placed close orders:", placed_order_ids)
-    print("Failed symbols:", failed_symbols)
-```
+    config = {"api_key": "...", "access_token": "..."}
+
+    with TTConnect(broker_id, config) as broker:
+        placed, failed = broker.close_all_positions()
+        print("Placed close orders:", placed)
+        print("Failed symbols:", failed)
+    ```
+
+=== "Async"
+
+    ```python
+    from tt_connect import AsyncTTConnect
+
+    config = {"api_key": "...", "access_token": "..."}
+
+    async with AsyncTTConnect(broker_id, config) as broker:
+        placed, failed = await broker.close_all_positions()
+        print("Placed close orders:", placed)
+        print("Failed symbols:", failed)
+    ```
 
 ## Important
-- This is a high-impact action.
-- Verify open positions before and after.
-- Run in controlled environments first.
 
-## What's next?
+- This is a high-impact action
+- Verify open positions before and after
+- Run in controlled environments first
+
+## What's next
+
 - [Cancel all open orders](cancel-all-open-orders.md) — cancel pending orders before closing positions
-- [Errors & Retries](../errors-and-retries.md) — handle partial failures gracefully
-
-## Related reference
-- [Client methods (`get_positions`, `close_all_positions`)](../reference/clients.md)
-- [Models (`Position`)](../reference/models.md)
-- [Safety & Good Practices](../safety-and-good-practices.md)
+- [Error Handling](../error-handling.md) — handle partial failures gracefully

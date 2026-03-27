@@ -2,23 +2,22 @@
 
 `tt-connect` gives one consistent Python API for multiple Indian brokers.
 
-## Start In 5 Minutes
+## Start in 5 minutes
 
-1. [Start Here](start-here.md): install, initialize, and verify setup
-2. [Basics](basics.md): core concepts before placing real orders
-3. [Login & Session](login-and-session.md): auth modes and token lifecycle
-4. [Config & Environment](config-and-env.md): safe defaults and common mistakes
+1. [Getting Started](getting-started.md) — install, core concepts, first script
+2. [Authentication](authentication.md) — auth modes and config
+3. [Recipe: First Order](recipes/first-order.md) — place your first live order
 
-## Common Tasks
+## Common tasks
 
-- [Place Your First Order](orders.md)
-- [Read Portfolio & Funds](holdings-and-funds.md)
-- [Use Market Data](market-data.md)
-- [Realtime WebSocket](realtime-websocket.md)
+- [Place and manage orders](orders.md)
+- [Read portfolio and funds](portfolio.md)
+- [Use market data](market-data.md)
+- [Stream live ticks](websocket.md)
 
-## Need Help Fast?
+## Need help?
 
-- Go to [Troubleshooting](troubleshooting/index.md) for auth/order/reconnect failures.
-- Use [Recipes](recipes/index.md) for ready copy-paste workflows.
-- Use [API Reference](reference/index.md) for exact models and method behavior.
-- Check [Glossary](glossary.md) if you are unsure about trading terms.
+- [Troubleshooting](troubleshooting/auth-failures.md) — auth, order, and instrument failures
+- [Recipes](recipes/first-order.md) — copy-paste workflows
+- [API Reference](reference/clients.md) — exact method signatures and models
+- [Broker Differences](broker-differences.md) — per-broker capabilities and quirks
